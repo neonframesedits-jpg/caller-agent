@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pickam Dashboard</title>
+<style>
+  :root { --bg:#f6f7f4; --card:#fff; --ink:#1b1f1a; --muted:#646b62; --line:#e2e5df; --brand:#0a7a3e; --brand-ink:#fff; --urgent:#c62828; --warn:#b26a00; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#121512; --card:#1b1f1b; --ink:#e9ece7; --muted:#9aa297; --line:#2c312b; --brand:#2fb36a; --brand-ink:#08130c; --urgent:#ff6b6b; --warn:#f0a840; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:2; }
+  header h1 { font-size:18px; margin:0; } header h1 span { color:var(--brand); }
+  #bizName { color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  nav { display:flex; gap:4px; padding:8px 16px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--card); }
+  nav button { border:0; background:none; color:var(--muted); padding:8px 12px; border-radius:8px; cursor:pointer; font:inherit; white-space:nowrap; }
+  nav button.active { background:var(--brand); color:var(--brand-ink); }
+  main { max-width:900px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .muted { color:var(--muted); font-size:13px; }
+  .pill { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); }
+  .pill.urgent { color:var(--urgent); border-color:var(--urgent); } .pill.normal { color:var(--warn); border-color:var(--warn); }
+  input, textarea, select { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; width:100%; }
+  textarea { min-height:70px; }
+  label { display:block; margin:10px 0 4px; font-weight:600; font-size:13px; }
+  button.btn { font:inherit; border:0; border-radius:8px; padding:8px 14px; background:var(--brand); color:var(--brand-ink); cursor:pointer; }
+  button.ghost { background:none; color:var(--ink); border:1px solid var(--line); }
+  #banner { display:none; background:var(--urgent); color:#fff; padding:12px 16px; font-weight:600; cursor:pointer; }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0 16px; }
+  .meter { height:8px; background:var(--line); border-radius:99px; overflow:hidden; } .meter > div { height:100%; background:var(--brand); }
+  pre { white-space:pre-wrap; margin:0; font:inherit; }
+  #login { max-width:420px; margin:80px auto; }
+</style>
+</head>
+<body>
+<div id="banner" onclick="ackRing()">Customer waiting for callback. Tap to silence.</div>
+<div id="login" class="card" hidden>
+  <h2>Pickam</h2>
+  <p class="muted">Paste the owner token you received when your business was set up.</p>
+  <input id="tokenInput" placeholder="Owner token">
+  <p><button class="btn" onclick="saveToken()">Open dashboard</button></p>
+</div>
+<div id="app" hidden>
+  <header><h1><span>Pick</span>am</h1><div id="bizName"></div><button class="btn ghost" onclick="enableSound()" id="soundBtn">Enable sound</button></header>
+  <nav id="tabs"></nav>
+  <main id="view"></main>
+</div>
+<script>
+const TABS = { inbox: "Callbacks", orders: "Orders", calls: "Calls", menu: "Menu", faqs: "Answers", settings: "Settings" };
+let token = new URLSearchParams(location.search).get("token") || localStorageGet("pickamToken");
+let tab = "inbox", state = {}, audio = null, ringTimer = null;
+
+function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const naira = (n) => "₦" + Number(n).toLocaleString("en-NG");
+const when = (t) => new Date(t.endsWith("Z") || t.includes("T") ? t : t.replace(" ", "T") + "Z").toLocaleString();
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: opts.body && JSON.stringify(opts.body) });
+  if (res.status === 401) { token = null; showLogin(); throw new Error("unauthorized"); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); if (!opts.quiet) alert(e.error || "Request failed"); throw new Error(e.error); }
+  return res.status === 204 ? null : res.json();
+}
+
+function saveToken() { token = document.getElementById("tokenInput").value.trim(); localStorageSet("pickamToken", token); start(); }
+function showLogin() { document.getElementById("login").hidden = false; document.getElementById("app").hidden = true; }
+
+// ---- Sound: a "ping ping" made with WebAudio, so no audio file is needed ----
+function enableSound() { audio = audio || new AudioContext(); audio.resume(); ping(); document.getElementById("soundBtn").textContent = "Sound on"; if ("Notification" in window) Notification.requestPermission(); }
+function ping() {
+  if (!audio) return;
+  [0, 0.25].forEach((delay) => {
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+    const t = audio.currentTime + delay; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.start(t); o.stop(t + 0.2);
+  });
+}
+function startRing() { document.getElementById("banner").style.display = "block"; if (!ringTimer) { ping(); ringTimer = setInterval(ping, 2000); } }
+function ackRing() { clearInterval(ringTimer); ringTimer = null; document.getElementById("banner").style.display = "none"; }
+
+function listen() {
+  const es = new EventSource("/api/alerts/stream?token=" + encodeURIComponent(token));
+  es.onmessage = (m) => {
+    const a = JSON.parse(m.data);
+    if (a.mode === "ring") startRing(); else if (a.mode === "notify") ping();
+    if (a.mode !== "digest" && "Notification" in window && Notification.permission === "granted") new Notification(a.title, { body: a.body });
+    render();
+  };
+}
+
+async function start() {
+  document.getElementById("login").hidden = true;
+  try { state.biz = await api("/api/business"); } catch { return; }
+  document.getElementById("app").hidden = false;
+  document.getElementById("bizName").textContent = state.biz.business.name;
+  document.getElementById("tabs").innerHTML = Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}">${v}</button>`).join("");
+  document.getElementById("tabs").onclick = (e) => { if (e.target.dataset.tab) { tab = e.target.dataset.tab; render(); } };
+  listen(); render();
+}
+
+async function render() {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  const v = document.getElementById("view");
+  v.innerHTML = await VIEWS[tab]();
+}
+
+const VIEWS = {
+  async inbox() {
+    const items = await api("/api/escalations");
+    const open = items.filter((e) => e.status !== "resolved");
+    if (!items.length) return `<div class="card muted">No callbacks yet. When the AI can't answer a customer, they show up here.</div>`;
+    return (open.length ? "" : `<div class="card muted">All caught up.</div>`) + items.map((e) => `
+      <div class="card">
+        <div class="row"><span class="pill ${e.urgency}">${e.urgency}</span><span class="pill">${e.status}</span><span class="muted">${when(e.created_at)} · call back by ${new Date(e.callback_due_at).toLocaleTimeString()}</span></div>
+        <h3 style="margin:8px 0 4px">${esc(e.question)}</h3>
+        <div>${esc(e.customer_name || "Customer")} ${e.customer_phone ? `· <a href="tel:${esc(e.customer_phone)}">${esc(e.customer_phone)}</a>` : ""}</div>
+        ${e.summary ? `<p class="muted">${esc(e.summary)}</p>` : ""}
+        ${e.status === "resolved" ? (e.owner_answer ? `<p><b>Your answer:</b> ${esc(e.owner_answer)}</p>` : "") : `
+          <label>Answer (optional): save it so the AI can answer this alone next time</label>
+          <textarea id="ans${e.id}"></textarea>
+          <div class="row" style="margin-top:8px">
+            ${e.status === "open" ? `<button class="btn ghost" onclick="escUpdate(${e.id},'acknowledged')">I'm calling them</button>` : ""}
+            <button class="btn" onclick="escUpdate(${e.id},'resolved')">Done</button>
+          </div>`}
+      </div>`).join("");
+  },
+  async orders() {
+    const items = await api("/api/orders");
+    if (!items.length) return `<div class="card muted">No orders yet.</div>`;
+    return items.map((o) => `
+      <div class="card">
+        <div class="row"><b>#${o.id} · ${naira(o.total_naira)}</b><span class="pill">${o.status}</span><span class="muted">${when(o.created_at)}</span></div>
+        <div>${o.items.map((i) => `${i.quantity} × ${esc(i.name)}`).join(", ")}</div>
+        <div class="muted">${esc(o.customer_name)} ${esc(o.customer_phone)} · ${esc(o.delivery_address)} ${o.notes ? "· " + esc(o.notes) : ""}</div>
+        <div class="row" style="margin-top:8px">${["confirmed", "delivered", "cancelled"].map((s) => `<button class="btn ghost" onclick="orderStatus(${o.id},'${s}')">${s}</button>`).join("")}</div>
+      </div>`).join("");
+  },
+  async calls() {
+    const items = await api("/api/calls");
+    const u = (await api("/api/business")).usage;
+    const pct = u.plan.includedMinutes ? Math.min(100, (100 * u.minutesUsed) / u.plan.includedMinutes) : 0;
+    return `<div class="card"><b>${esc(u.plan.name)}</b> · ${u.minutesUsed} of ${u.plan.includedMinutes} minutes used this month
+      <div class="meter" style="margin-top:8px"><div style="width:${pct}%"></div></div>
+      ${u.overageMinutes ? `<p class="muted">${u.overageMinutes} extra minutes · estimated bill ${naira(u.estimatedBillNaira)}</p>` : ""}</div>` +
+      (items.length ? items.map((c) => `
+        <div class="card"><div class="row"><b>${esc(c.customer_phone || "Unknown number")}</b><span class="muted">${when(c.created_at)} · ${Math.ceil(c.duration_secs / 60)} min</span></div>
+        <p>${esc(c.summary || "No summary")}</p>
+        <details><summary class="muted" onclick="loadTranscript(this, '${esc(c.conversation_id)}')">Transcript</summary><div></div></details></div>`).join("")
+        : `<div class="card muted">No calls yet.</div>`);
+  },
+  async menu() {
+    const items = await api("/api/products");
+    return `<div class="card"><b>Add item</b><div class="grid2">
+        <div><label>Name</label><input id="pName" placeholder="Jollof rice + chicken"></div>
+        <div><label>Price (₦)</label><input id="pPrice" type="number" min="0" placeholder="3500"></div></div>
+        <label>Description</label><input id="pDesc" placeholder="Comes with plantain">
+        <p><button class="btn" onclick="addProduct()">Add</button></p></div>` +
+      items.map((p) => `<div class="card row"><div style="flex:1"><b>${esc(p.name)}</b> · ${naira(p.priceNaira)}<div class="muted">${esc(p.description)}</div></div>
+        <button class="btn ${p.available ? "ghost" : ""}" onclick="toggleProduct(${p.id}, ${!p.available})">${p.available ? "Mark sold out" : "Sold out · restock"}</button>
+        <button class="btn ghost" onclick="delProduct(${p.id})">Delete</button></div>`).join("");
+  },
+  async faqs() {
+    const items = await api("/api/faqs");
+    return `<div class="card"><b>Teach the AI an answer</b>
+        <label>Customer asks</label><input id="fQ" placeholder="Do you deliver to Lekki?">
+        <label>Answer</label><textarea id="fA" placeholder="Yes, delivery to Lekki is ₦2,000 and takes about an hour."></textarea>
+        <p><button class="btn" onclick="addFaq()">Save answer</button></p></div>` +
+      items.map((f) => `<div class="card"><div class="row"><b style="flex:1">${esc(f.question)}</b>${f.source === "learned" ? `<span class="pill">learned from a call</span>` : ""}
+        <button class="btn ghost" onclick="delFaq(${f.id})">Delete</button></div><pre>${esc(f.answer)}</pre></div>`).join("");
+  },
+  async settings() {
+    const { business: b } = (state.biz = await api("/api/business"));
+    const s = b.settings;
+    const modeSel = (k) => `<select id="al_${k}">${["ring", "notify", "digest"].map((m) => `<option ${s.alerts[k] === m ? "selected" : ""}>${m}</option>`).join("")}</select>`;
+    const f = (id, label, val, ph = "") => `<label>${label}</label><input id="${id}" value="${esc(val)}" placeholder="${ph}">`;
+    return `<div class="card"><b>Business</b><div class="grid2">
+        ${f("name", "Business name", b.name)}${f("category", "What you sell", b.category, "Food, fashion, phones…")}
+        ${f("location", "Location", b.location, "Surulere, Lagos")}${f("openingHours", "Opening hours", b.openingHours, "Mon–Sat 9am–8pm")}
+        ${f("ownerName", "Your name", b.ownerName)}${f("ownerPhone", "Your phone (for SMS alerts)", b.ownerPhone, "+234…")}</div>
+        <label>About the business</label><textarea id="description">${esc(b.description)}</textarea>
+        <label>Delivery</label><textarea id="deliveryInfo" placeholder="We use dispatch riders. Lagos Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea></div>
+      <div class="card"><b>Your AI receptionist</b><div class="grid2">
+        ${f("agentName", "AI name", s.agentName)}
+        <div><label>Language</label><select id="languageStyle"><option value="pidgin" ${s.languageStyle === "pidgin" ? "selected" : ""}>English + Pidgin when caller uses it</option><option value="english" ${s.languageStyle === "english" ? "selected" : ""}>English only</option></select></div></div>
+        <label>Greeting</label><input id="greeting" value="${esc(s.greeting)}">
+        <label><input type="checkbox" id="takeOrders" ${s.takeOrders ? "checked" : ""} style="width:auto"> Let the AI take orders</label>
+        <label>Payment instructions read to customers after an order</label><textarea id="paymentInstructions" placeholder="Pay to GTBank 0123456789, Mama Tee's Kitchen, and send proof on WhatsApp.">${esc(s.paymentInstructions)}</textarea>
+        <label>Rules the AI must follow</label><textarea id="extraRules" placeholder="Never give discounts. Don't promise delivery before 11am.">${esc(s.extraRules)}</textarea></div>
+      <div class="card"><b>When the AI needs you</b>
+        <label>Tell customers you'll call back within (minutes)</label><input id="callbackMinutes" type="number" min="1" value="${s.callbackMinutes}">
+        <div class="grid2"><div><label>Urgent</label>${modeSel("urgent")}</div><div><label>Normal</label>${modeSel("normal")}</div><div><label>Low</label>${modeSel("low")}</div></div>
+        <p class="muted">ring = keeps pinging until you tap it · notify = one ping + SMS · digest = shows in the inbox quietly</p>
+        <label><input type="checkbox" id="smsAlerts" ${s.smsAlerts ? "checked" : ""} style="width:auto"> Also send me SMS alerts</label>
+        <label><input type="checkbox" id="qhOn" ${s.quietHours.enabled ? "checked" : ""} style="width:auto"> Quiet hours (only urgent alerts come through)</label>
+        <div class="grid2"><div><label>From</label><input id="qhStart" type="time" value="${s.quietHours.start}"></div><div><label>To</label><input id="qhEnd" type="time" value="${s.quietHours.end}"></div></div></div>
+      <div class="row"><button class="btn" onclick="saveSettings()">Save settings</button><span class="muted">Saving also updates your AI's phone agent.</span></div>`;
+  },
+};
+
+const val = (id) => document.getElementById(id).value;
+const checked = (id) => document.getElementById(id).checked;
+async function escUpdate(id, status) { const ownerAnswer = val("ans" + id).trim(); await api(`/api/escalations/${id}`, { method: "PATCH", body: { status, ownerAnswer: ownerAnswer || undefined, saveAsFaq: !!ownerAnswer } }); ackRing(); render(); }
+async function orderStatus(id, status) { await api(`/api/orders/${id}`, { method: "PATCH", body: { status } }); render(); }
+async function addProduct() { await api("/api/products", { method: "POST", body: { name: val("pName"), priceNaira: Number(val("pPrice")), description: val("pDesc") } }); render(); }
+async function toggleProduct(id, available) { await api(`/api/products/${id}`, { method: "PATCH", body: { available } }); render(); }
+async function delProduct(id) { if (confirm("Delete this item?")) { await api(`/api/products/${id}`, { method: "DELETE" }); render(); } }
+async function addFaq() { await api("/api/faqs", { method: "POST", body: { question: val("fQ"), answer: val("fA") } }); render(); }
+async function delFaq(id) { if (confirm("Delete this answer?")) { await api(`/api/faqs/${id}`, { method: "DELETE" }); render(); } }
+async function loadTranscript(el, id) {
+  const box = el.nextElementSibling; if (box.dataset.loaded) return; box.dataset.loaded = 1;
+  const c = await api("/api/calls/" + encodeURIComponent(id));
+  box.innerHTML = c.transcript.map((t) => `<p><b>${t.role === "agent" ? "AI" : "Caller"}:</b> ${esc(t.message)}</p>`).join("");
+}
+async function saveSettings() {
+  const profile = Object.fromEntries(["name", "category", "location", "openingHours", "ownerName", "ownerPhone", "description", "deliveryInfo"].map((k) => [k, val(k)]));
+  const settings = {
+    agentName: val("agentName"), greeting: val("greeting"), languageStyle: val("languageStyle"), takeOrders: checked("takeOrders"),
+    paymentInstructions: val("paymentInstructions"), extraRules: val("extraRules"), callbackMinutes: Number(val("callbackMinutes")),
+    alerts: { urgent: val("al_urgent"), normal: val("al_normal"), low: val("al_low") }, smsAlerts: checked("smsAlerts"),
+    quietHours: { enabled: checked("qhOn"), start: val("qhStart"), end: val("qhEnd") },
+  };
+  await api("/api/business", { method: "PUT", body: { profile, settings } });
+  try { await api("/api/agent/sync", { method: "POST", quiet: true }); alert("Saved and AI updated."); } catch { alert("Saved. The AI agent could not be updated. Check the ElevenLabs settings on the server."); }
+}
+
+if (token) { localStorageSet("pickamToken", token); history.replaceState(null, "", location.pathname); start(); } else showLogin();
+</script>
+</body>
+</html>
