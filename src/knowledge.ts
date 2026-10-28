@@ -38,7 +38,11 @@ export interface FaqMatch extends Faq {
 export function searchFaqs(faqs: Faq[], question: string, limit = 3, minScore = 0.34): FaqMatch[] {
   const q = tokenize(question);
   return faqs
-    .map((f) => ({ ...f, score: Math.max(overlap(q, tokenize(f.question)), 0.7 * overlap(q, tokenize(f.answer))) }))
+    .map((f) => ({
+      ...f,
+      // Free-form notes have no question, so they are matched on their text alone.
+      score: f.question ? Math.max(overlap(q, tokenize(f.question)), 0.7 * overlap(q, tokenize(f.answer))) : overlap(q, tokenize(f.answer)),
+    }))
     .filter((f) => f.score >= minScore)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);

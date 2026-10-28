@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
 import { config } from "./config.js";
-import type { AlertMode, Business, Urgency } from "./db.js";
+import { linkWhatsAppMessage, type AlertMode, type Business, type Urgency } from "./db.js";
+import { sendAlertTemplate, whatsappConfigured } from "./whatsapp.js";
 
 export interface OwnerAlert {
-  kind: "escalation" | "order" | "call";
+  kind: "escalation" | "order" | "call" | "payment" | "billing";
   urgency: Urgency;
   /** Resolved delivery mode after settings and quiet hours are applied. */
   mode: AlertMode;
@@ -60,17 +61,50 @@ export async function sendSms(to: string, message: string): Promise<void> {
   if (!res.ok) throw new Error(`Africa's Talking SMS failed: ${res.status} ${await res.text()}`);
 }
 
-/** Push an alert to the owner's open dashboards and, if configured, by SMS. */
-export async function alertOwner(business: Business, alert: Omit<OwnerAlert, "mode" | "at">): Promise<OwnerAlert> {
-  const full: OwnerAlert = { ...alert, mode: resolveAlertMode(business.settings, alert.urgency), at: new Date().toISOString() };
-  alertBus.emit(`business:${business.id}`, full);
-  if (full.mode !== "digest" && business.settings.smsAlerts) {
-    const prefix = full.mode === "ring" ? "URGENT - " : "";
+/**
+ * Message the owner outside the dashboard: WhatsApp first (if on), SMS as backup.
+ * `alsoSms` sends the SMS even when WhatsApp worked (used for "ring" alerts).
+ * Returns the WhatsApp message id, if one was sent.
+ */
+export async function messageOwner(business: Business, title: string, details: string, alsoSms = false): Promise<string | null> {
+  const s = business.settings;
+  let waId: string | null = null;
+  if (s.whatsappAlerts && whatsappConfigured() && business.ownerPhone) {
     try {
-      await sendSms(business.ownerPhone, `${prefix}Pickam: ${full.title}\n${full.body}`.slice(0, 459));
+      waId = await sendAlertTemplate(business.ownerPhone, title, details);
+    } catch (err) {
+      console.error("[notify] WhatsApp failed", err);
+    }
+  }
+  if (s.smsAlerts && (!waId || alsoSms)) {
+    try {
+      await sendSms(business.ownerPhone, `Pickam: ${title}\n${details}`.slice(0, 459));
     } catch (err) {
       console.error("[notify] SMS failed", err);
     }
   }
+  return waId;
+}
+
+/** Push an alert to the owner's open dashboards and, unless it's a digest item, to WhatsApp/SMS. */
+export async function alertOwner(
+  business: Business,
+  alert: Omit<OwnerAlert, "mode" | "at">,
+  opts: { forceMode?: AlertMode; escalationId?: number } = {},
+): Promise<OwnerAlert> {
+  const mode = opts.forceMode ?? resolveAlertMode(business.settings, alert.urgency);
+  const full: OwnerAlert = { ...alert, mode, at: new Date().toISOString() };
+  alertBus.emit(`business:${business.id}`, full);
+  if (mode !== "digest") {
+    const title = mode === "ring" ? `URGENT - ${full.title}` : full.title;
+    const waId = await messageOwner(business, title, full.body, mode === "ring");
+    if (waId && opts.escalationId) linkWhatsAppMessage(waId, business.id, opts.escalationId);
+  }
   return full;
+}
+
+/** Tell Pickam staff about something that needs a human (e.g. the number pool is empty). */
+export async function alertAdmin(message: string) {
+  console.warn(`[admin] ${message}`);
+  if (config.adminPhone) await sendSms(config.adminPhone, `Pickam admin: ${message}`).catch((err) => console.error("[notify] admin SMS failed", err));
 }

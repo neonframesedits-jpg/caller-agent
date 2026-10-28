@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { config } from "./config.js";
 
 export type AlertMode = "ring" | "notify" | "digest";
@@ -10,7 +10,7 @@ export type Urgency = "low" | "normal" | "urgent";
 export interface Settings {
   /** Name the AI introduces itself with, e.g. "Ada". */
   agentName: string;
-  /** First thing the AI says when it picks up. */
+  /** First thing the AI says when it picks up. Empty = generated from the business and AI name. */
   greeting: string;
   /** "english" = clear Nigerian English; "pidgin" = switches to Pidgin when the caller does. */
   languageStyle: "english" | "pidgin";
@@ -18,30 +18,49 @@ export interface Settings {
   callbackMinutes: number;
   /** How hard to alert the owner, per urgency level. */
   alerts: Record<Urgency, AlertMode>;
-  /** Send SMS (Africa's Talking) for alerts that are not "digest". */
+  /** Send alerts to the owner's WhatsApp. */
+  whatsappAlerts: boolean;
+  /** Send SMS when WhatsApp is off or fails, and always for "ring" alerts. */
   smsAlerts: boolean;
   /** During quiet hours, everything except "urgent" is held for the digest. 24h "HH:MM", Africa/Lagos time. */
   quietHours: { enabled: boolean; start: string; end: string };
+  /** Text the customer an apology if the promised callback time passes. */
+  apologySms: boolean;
+  /** When the owner answers a callback, the AI phones the customer with the answer by default. */
+  aiCallsBack: boolean;
+  /** Daily WhatsApp summary of yesterday's calls, orders and pending callbacks. */
+  dailySummary: { enabled: boolean; time: string };
   /** Let the AI take orders and quote totals. */
   takeOrders: boolean;
-  /** Read out to customers after an order. */
+  /** Text the caller a Paystack link to pay for their order (needs a payout account). */
+  paymentLinks: boolean;
+  /** Read out to customers after an order when payment links are off. */
   paymentInstructions: string;
   /** Things the AI must never do or promise, written by the owner. */
   extraRules: string;
 }
 
-export const defaultSettings = (businessName: string): Settings => ({
+export const defaultSettings = (): Settings => ({
   agentName: "Ada",
-  greeting: `Hello, thank you for calling ${businessName}! I'm Ada, the virtual assistant. How can I help you today?`,
+  greeting: "",
   languageStyle: "pidgin",
   callbackMinutes: 10,
   alerts: { low: "digest", normal: "notify", urgent: "ring" },
+  whatsappAlerts: true,
   smsAlerts: true,
   quietHours: { enabled: false, start: "22:00", end: "07:00" },
+  apologySms: true,
+  aiCallsBack: true,
+  dailySummary: { enabled: true, time: "08:00" },
   takeOrders: true,
+  paymentLinks: true,
   paymentInstructions: "",
   extraRules: "",
 });
+
+export const greetingFor = (b: Pick<Business, "name" | "settings">) =>
+  b.settings.greeting ||
+  `Hello, thank you for calling ${b.name}! I'm ${b.settings.agentName}, the virtual assistant. How can I help you today?`;
 
 export interface Business {
   id: string;
@@ -57,6 +76,15 @@ export interface Business {
   toolSecret: string;
   agentId: string | null;
   plan: string;
+  planExpiresAt: string;
+  periodStart: string;
+  walletNaira: number;
+  /** The Pickam number customers' calls are answered on. */
+  phoneNumber: string | null;
+  paystackSubaccount: string | null;
+  payoutAccountName: string | null;
+  onboarded: boolean;
+  lastDigestDate: string | null;
   settings: Settings;
   createdAt: string;
 }
@@ -77,7 +105,7 @@ export function openDb(path: string): DatabaseSync {
 
     CREATE TABLE IF NOT EXISTS businesses (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
       category TEXT NOT NULL DEFAULT '',
       location TEXT NOT NULL DEFAULT '',
@@ -89,14 +117,23 @@ export function openDb(path: string): DatabaseSync {
       tool_secret TEXT NOT NULL,
       agent_id TEXT UNIQUE,
       plan TEXT NOT NULL DEFAULT 'trial',
+      plan_expires_at TEXT NOT NULL,
+      period_start TEXT NOT NULL,
+      wallet_naira INTEGER NOT NULL DEFAULT 0,
+      phone_number TEXT,
+      paystack_subaccount TEXT,
+      payout_account_name TEXT,
+      onboarded INTEGER NOT NULL DEFAULT 0,
+      last_digest_date TEXT,
       settings_json TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS businesses_owner_phone ON businesses(owner_phone) WHERE owner_phone != '';
 
     CREATE TABLE IF NOT EXISTS faqs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-      question TEXT NOT NULL,
+      question TEXT NOT NULL DEFAULT '',
       answer TEXT NOT NULL,
       source TEXT NOT NULL DEFAULT 'owner',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -123,6 +160,8 @@ export function openDb(path: string): DatabaseSync {
       status TEXT NOT NULL DEFAULT 'open',
       owner_answer TEXT,
       callback_due_at TEXT NOT NULL,
+      reminded_at TEXT,
+      ai_callback_status TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       resolved_at TEXT
     );
@@ -138,6 +177,8 @@ export function openDb(path: string): DatabaseSync {
       delivery_address TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'new',
+      payment_status TEXT NOT NULL DEFAULT 'unpaid',
+      payment_link TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -151,11 +192,62 @@ export function openDb(path: string): DatabaseSync {
       successful TEXT NOT NULL DEFAULT 'unknown',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      phone TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      window_start INTEGER NOT NULL,
+      sent_in_window INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token_hash TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      reference TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      purpose TEXT NOT NULL,            -- plan | wallet | order
+      amount_naira INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      meta_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS wallet_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      amount_naira INTEGER NOT NULL,     -- positive = credit, negative = debit
+      reason TEXT NOT NULL,
+      ref TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS phone_numbers (
+      number TEXT PRIMARY KEY,
+      elevenlabs_phone_number_id TEXT,
+      business_id TEXT UNIQUE REFERENCES businesses(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Links WhatsApp alerts we sent to the escalation they were about, so a swipe-reply answers it.
+    CREATE TABLE IF NOT EXISTS wa_messages (
+      wa_message_id TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      escalation_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
   return db;
 }
 
-const token = () => randomBytes(24).toString("base64url");
+export const randomToken = () => randomBytes(24).toString("base64url");
+export const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 
 type Row = Record<string, any>;
 
@@ -175,28 +267,41 @@ function toBusiness(row: Row | undefined): Business | null {
     toolSecret: row.tool_secret,
     agentId: row.agent_id,
     plan: row.plan,
+    planExpiresAt: row.plan_expires_at,
+    periodStart: row.period_start,
+    walletNaira: row.wallet_naira,
+    phoneNumber: row.phone_number,
+    paystackSubaccount: row.paystack_subaccount,
+    payoutAccountName: row.payout_account_name,
+    onboarded: row.onboarded === 1,
+    lastDigestDate: row.last_digest_date,
     // Merge so settings added in later versions get their defaults.
-    settings: { ...defaultSettings(row.name), ...JSON.parse(row.settings_json) },
+    settings: { ...defaultSettings(), ...JSON.parse(row.settings_json) },
     createdAt: row.created_at,
   };
 }
 
-export function createBusiness(input: { name: string; ownerName?: string; ownerPhone?: string; plan?: string }): Business {
+export const TRIAL_DAYS = 14;
+
+export function createBusiness(input: { name?: string; ownerName?: string; ownerPhone?: string; plan?: string }): Business {
   const id = randomUUID();
+  const now = new Date().toISOString();
   getDb()
     .prepare(
-      `INSERT INTO businesses (id, name, owner_name, owner_phone, owner_token, tool_secret, plan, settings_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO businesses (id, name, owner_name, owner_phone, owner_token, tool_secret, plan, plan_expires_at, period_start, settings_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
-      input.name,
+      input.name ?? "",
       input.ownerName ?? "",
       input.ownerPhone ?? "",
-      token(),
-      token(),
+      randomToken(),
+      randomToken(),
       input.plan ?? "trial",
-      JSON.stringify(defaultSettings(input.name)),
+      daysFromNow(TRIAL_DAYS),
+      now,
+      JSON.stringify(defaultSettings()),
     );
   return getBusiness(id)!;
 }
@@ -206,10 +311,13 @@ export const getBusinessByToken = (t: string) =>
   toBusiness(getDb().prepare("SELECT * FROM businesses WHERE owner_token = ?").get(t) as Row);
 export const getBusinessByAgentId = (agentId: string) =>
   toBusiness(getDb().prepare("SELECT * FROM businesses WHERE agent_id = ?").get(agentId) as Row);
+export const getBusinessByOwnerPhone = (phone: string) =>
+  toBusiness(getDb().prepare("SELECT * FROM businesses WHERE owner_phone = ? AND owner_phone != ''").get(phone) as Row);
+export const listBusinesses = () => (getDb().prepare("SELECT * FROM businesses").all() as Row[]).map((r) => toBusiness(r)!);
 
 export type BusinessProfile = Pick<
   Business,
-  "name" | "description" | "category" | "location" | "openingHours" | "deliveryInfo" | "ownerName" | "ownerPhone"
+  "name" | "description" | "category" | "location" | "openingHours" | "deliveryInfo" | "ownerName"
 >;
 
 export function updateBusiness(id: string, profile: Partial<BusinessProfile>, settings?: Partial<Settings>) {
@@ -219,7 +327,7 @@ export function updateBusiness(id: string, profile: Partial<BusinessProfile>, se
   getDb()
     .prepare(
       `UPDATE businesses SET name = ?, description = ?, category = ?, location = ?, opening_hours = ?,
-       delivery_info = ?, owner_name = ?, owner_phone = ?, settings_json = ? WHERE id = ?`,
+       delivery_info = ?, owner_name = ?, settings_json = ? WHERE id = ?`,
     )
     .run(
       next.name,
@@ -229,24 +337,88 @@ export function updateBusiness(id: string, profile: Partial<BusinessProfile>, se
       next.openingHours,
       next.deliveryInfo,
       next.ownerName,
-      next.ownerPhone,
       JSON.stringify(next.settings),
       id,
     );
   return getBusiness(id)!;
 }
 
-export function setAgentId(businessId: string, agentId: string) {
-  getDb().prepare("UPDATE businesses SET agent_id = ? WHERE id = ?").run(agentId, businessId);
+/** Update internal (non-owner-editable) columns. */
+export function setBusinessFields(
+  id: string,
+  fields: Partial<{
+    agent_id: string;
+    plan: string;
+    plan_expires_at: string;
+    period_start: string;
+    phone_number: string;
+    paystack_subaccount: string;
+    payout_account_name: string;
+    onboarded: number;
+    last_digest_date: string;
+  }>,
+) {
+  const keys = Object.keys(fields);
+  if (!keys.length) return;
+  getDb()
+    .prepare(`UPDATE businesses SET ${keys.map((k) => `${k} = ?`).join(", ")} WHERE id = ?`)
+    .run(...(Object.values(fields) as (string | number)[]), id);
 }
 
-// ---- FAQs -------------------------------------------------------------------
+export const setAgentId = (businessId: string, agentId: string) => setBusinessFields(businessId, { agent_id: agentId });
+
+// ---- Auth: one-time codes and sessions ----------------------------------------------
+
+export interface OtpRow {
+  phone: string;
+  code_hash: string;
+  expires_at: number;
+  attempts: number;
+  window_start: number;
+  sent_in_window: number;
+}
+
+export const getOtp = (phone: string) => getDb().prepare("SELECT * FROM otp_codes WHERE phone = ?").get(phone) as unknown as OtpRow | undefined;
+
+export function saveOtp(row: OtpRow) {
+  getDb()
+    .prepare(
+      `INSERT INTO otp_codes (phone, code_hash, expires_at, attempts, window_start, sent_in_window) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(phone) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = excluded.attempts,
+         window_start = excluded.window_start, sent_in_window = excluded.sent_in_window`,
+    )
+    .run(row.phone, row.code_hash, row.expires_at, row.attempts, row.window_start, row.sent_in_window);
+}
+
+export const bumpOtpAttempts = (phone: string) => getDb().prepare("UPDATE otp_codes SET attempts = attempts + 1 WHERE phone = ?").run(phone);
+/** Spend the code but keep the row, so the hourly send limit still applies. */
+export const consumeOtp = (phone: string) => getDb().prepare("UPDATE otp_codes SET expires_at = 0 WHERE phone = ?").run(phone);
+
+export const SESSION_DAYS = 30;
+
+export function createSession(businessId: string): string {
+  const token = randomToken();
+  getDb()
+    .prepare("INSERT INTO sessions (token_hash, business_id, expires_at) VALUES (?, ?, ?)")
+    .run(sha256(token), businessId, Date.now() + SESSION_DAYS * 86_400_000);
+  return token;
+}
+
+export function getBusinessBySession(token: string): Business | null {
+  const row = getDb().prepare("SELECT business_id, expires_at FROM sessions WHERE token_hash = ?").get(sha256(token)) as Row | undefined;
+  return row && row.expires_at > Date.now() ? getBusiness(row.business_id) : null;
+}
+
+export const deleteSession = (token: string) => getDb().prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha256(token));
+
+// ---- FAQs and owner notes -------------------------------------------------------------
 
 export interface Faq {
   id: number;
+  /** Empty for free-form notes (e.g. an owner's WhatsApp voice note). */
   question: string;
   answer: string;
-  source: "owner" | "learned";
+  source: "owner" | "learned" | "whatsapp";
 }
 
 export const listFaqs = (businessId: string) =>
@@ -302,6 +474,7 @@ export function deleteProduct(businessId: string, id: number) {
 
 export interface Escalation {
   id: number;
+  business_id: string;
   conversation_id: string | null;
   customer_name: string;
   customer_phone: string;
@@ -311,6 +484,9 @@ export interface Escalation {
   status: "open" | "acknowledged" | "resolved";
   owner_answer: string | null;
   callback_due_at: string;
+  reminded_at: string | null;
+  /** null = no AI callback; "calling" | "failed" | "no_number" */
+  ai_callback_status: string | null;
   created_at: string;
   resolved_at: string | null;
 }
@@ -348,6 +524,27 @@ export function updateEscalation(businessId: string, id: number, status: Escalat
     .run(status, ownerAnswer ?? null, status, businessId, id);
 }
 
+export const setEscalationCallbackStatus = (id: number, status: string) =>
+  getDb().prepare("UPDATE escalations SET ai_callback_status = ? WHERE id = ?").run(status, id);
+
+/** Open escalations whose promised callback time has passed and that have not been chased yet. */
+export const listOverdueEscalations = (nowIso: string) =>
+  getDb()
+    .prepare("SELECT * FROM escalations WHERE status = 'open' AND reminded_at IS NULL AND callback_due_at < ?")
+    .all(nowIso) as unknown as Escalation[];
+
+export const markEscalationReminded = (id: number) =>
+  getDb().prepare("UPDATE escalations SET reminded_at = datetime('now') WHERE id = ?").run(id);
+
+export function linkWhatsAppMessage(waMessageId: string, businessId: string, escalationId: number) {
+  getDb().prepare("INSERT OR IGNORE INTO wa_messages (wa_message_id, business_id, escalation_id) VALUES (?, ?, ?)").run(waMessageId, businessId, escalationId);
+}
+
+export function escalationForWhatsAppMessage(businessId: string, waMessageId: string): Escalation | undefined {
+  const row = getDb().prepare("SELECT escalation_id FROM wa_messages WHERE business_id = ? AND wa_message_id = ?").get(businessId, waMessageId) as Row | undefined;
+  return row ? getEscalation(businessId, row.escalation_id) : undefined;
+}
+
 // ---- Orders -------------------------------------------------------------------
 
 export interface OrderItem {
@@ -380,7 +577,15 @@ export function updateOrderStatus(businessId: string, id: number, status: string
   getDb().prepare("UPDATE orders SET status = ? WHERE business_id = ? AND id = ?").run(status, businessId, id);
 }
 
+export function setOrderPayment(id: number, fields: { payment_status?: string; payment_link?: string }) {
+  if (fields.payment_status) getDb().prepare("UPDATE orders SET payment_status = ? WHERE id = ?").run(fields.payment_status, id);
+  if (fields.payment_link) getDb().prepare("UPDATE orders SET payment_link = ? WHERE id = ?").run(fields.payment_link, id);
+}
+
 // ---- Calls & usage ------------------------------------------------------------------
+
+export const callExists = (conversationId: string) =>
+  !!getDb().prepare("SELECT 1 FROM calls WHERE conversation_id = ?").get(conversationId);
 
 export function upsertCall(
   businessId: string,
@@ -408,13 +613,100 @@ export const getCall = (businessId: string, conversationId: string) => {
   return row ? { ...row, transcript: JSON.parse(row.transcript_json) } : undefined;
 };
 
-/** Billable minutes this calendar month. Each call is rounded up to the next full minute. */
-export function minutesUsedThisMonth(businessId: string): number {
+/** Billable minutes since the given time, excluding one call. Each call is rounded up to the next full minute. */
+export function minutesUsedSince(businessId: string, sinceIso: string, excludeConversationId = ""): number {
+  // created_at uses SQLite's "YYYY-MM-DD HH:MM:SS" (UTC); compare in the same format.
+  const since = sinceIso.replace("T", " ").slice(0, 19);
   const row = getDb()
     .prepare(
       `SELECT COALESCE(SUM((duration_secs + 59) / 60), 0) AS minutes FROM calls
-       WHERE business_id = ? AND created_at >= strftime('%Y-%m-01', 'now')`,
+       WHERE business_id = ? AND created_at >= ? AND conversation_id != ?`,
     )
-    .get(businessId) as Row;
+    .get(businessId, since, excludeConversationId) as Row;
   return Number(row.minutes);
 }
+
+/** Calls, orders and escalations created in a UTC time range, for the daily summary. */
+export function activityBetween(businessId: string, fromIso: string, toIso: string) {
+  const from = fromIso.replace("T", " ").slice(0, 19);
+  const to = toIso.replace("T", " ").slice(0, 19);
+  const d = getDb();
+  const calls = (d.prepare("SELECT COUNT(*) AS n FROM calls WHERE business_id = ? AND created_at >= ? AND created_at < ?").get(businessId, from, to) as Row).n;
+  const orders = d
+    .prepare("SELECT COUNT(*) AS n, COALESCE(SUM(total_naira), 0) AS total FROM orders WHERE business_id = ? AND created_at >= ? AND created_at < ? AND status != 'cancelled'")
+    .get(businessId, from, to) as Row;
+  const questions = d
+    .prepare("SELECT question FROM escalations WHERE business_id = ? AND created_at >= ? AND created_at < ? ORDER BY id DESC LIMIT 3")
+    .all(businessId, from, to) as Row[];
+  const pending = (d.prepare("SELECT COUNT(*) AS n FROM escalations WHERE business_id = ? AND status != 'resolved'").get(businessId) as Row).n;
+  return {
+    calls: Number(calls),
+    orders: Number(orders.n),
+    orderTotalNaira: Number(orders.total),
+    pendingCallbacks: Number(pending),
+    unansweredQuestions: questions.map((q) => q.question as string),
+  };
+}
+
+// ---- Payments & wallet --------------------------------------------------------------
+
+export interface Payment {
+  reference: string;
+  business_id: string;
+  purpose: "plan" | "wallet" | "order";
+  amount_naira: number;
+  status: "pending" | "success";
+  meta: Record<string, any>;
+}
+
+export function createPayment(p: Omit<Payment, "status">) {
+  getDb()
+    .prepare("INSERT INTO payments (reference, business_id, purpose, amount_naira, meta_json) VALUES (?, ?, ?, ?, ?)")
+    .run(p.reference, p.business_id, p.purpose, p.amount_naira, JSON.stringify(p.meta));
+}
+
+export function getPayment(reference: string): Payment | undefined {
+  const row = getDb().prepare("SELECT * FROM payments WHERE reference = ?").get(reference) as Row | undefined;
+  return row ? ({ ...row, meta: JSON.parse(row.meta_json) } as Payment) : undefined;
+}
+
+/** Marks a pending payment successful. Returns false if it was already processed (webhooks retry). */
+export const markPaymentSuccess = (reference: string) =>
+  Number(getDb().prepare("UPDATE payments SET status = 'success' WHERE reference = ? AND status = 'pending'").run(reference).changes) === 1;
+
+export function adjustWallet(businessId: string, amountNaira: number, reason: string, ref?: string) {
+  if (amountNaira === 0) return;
+  getDb().prepare("UPDATE businesses SET wallet_naira = wallet_naira + ? WHERE id = ?").run(amountNaira, businessId);
+  getDb().prepare("INSERT INTO wallet_ledger (business_id, amount_naira, reason, ref) VALUES (?, ?, ?, ?)").run(businessId, amountNaira, reason, ref ?? null);
+}
+
+export const listWalletLedger = (businessId: string) =>
+  getDb().prepare("SELECT amount_naira, reason, ref, created_at FROM wallet_ledger WHERE business_id = ? ORDER BY id DESC LIMIT 50").all(businessId);
+
+// ---- Phone number pool ------------------------------------------------------------------
+
+export interface PoolNumber {
+  number: string;
+  elevenlabs_phone_number_id: string | null;
+  business_id: string | null;
+}
+
+export function addPoolNumber(number: string, elevenlabsId: string | null) {
+  getDb().prepare("INSERT INTO phone_numbers (number, elevenlabs_phone_number_id) VALUES (?, ?)").run(number, elevenlabsId);
+}
+
+export const listPoolNumbers = () => getDb().prepare("SELECT * FROM phone_numbers ORDER BY created_at").all() as unknown as PoolNumber[];
+export const getPoolNumberForBusiness = (businessId: string) =>
+  getDb().prepare("SELECT * FROM phone_numbers WHERE business_id = ?").get(businessId) as unknown as PoolNumber | undefined;
+
+/** Atomically reserve a free number for a business. */
+export function claimPoolNumber(businessId: string): PoolNumber | undefined {
+  const row = getDb()
+    .prepare(
+      "UPDATE phone_numbers SET business_id = ? WHERE number = (SELECT number FROM phone_numbers WHERE business_id IS NULL ORDER BY created_at LIMIT 1) RETURNING *",
+    )
+    .get(businessId) as unknown as PoolNumber | undefined;
+  return row;
+}
+
+export const releasePoolNumber = (number: string) => getDb().prepare("UPDATE phone_numbers SET business_id = NULL WHERE number = ?").run(number);

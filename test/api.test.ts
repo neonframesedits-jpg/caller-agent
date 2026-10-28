@@ -1,39 +1,35 @@
+// Core call flow: lookups, orders, escalations, learning, post-call webhook.
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
 import type { Server } from "node:http";
-import { config } from "../src/config.js";
-import { createBusiness, openDb, setAgentId, type Business } from "../src/db.js";
+import { createBusiness, setAgentId, setBusinessFields, type Business } from "../src/db.js";
 import { alertBus, type OwnerAlert } from "../src/notify.js";
-import { createApp } from "../src/server.js";
+import { client, settle, signElevenLabs, startTestServer, stopTestServer } from "./helpers.js";
 
 let server: Server;
 let base: string;
 let biz: Business;
+let owner: ReturnType<typeof client>;
 const alerts: OwnerAlert[] = [];
 
 before(async () => {
-  openDb(":memory:");
-  config.africasTalking.apiKey = ""; // never send real SMS from tests
-  config.elevenlabs.webhookSecret = "whsec";
+  ({ server, base } = await startTestServer());
   biz = createBusiness({ name: "Mama Tee's Kitchen", ownerPhone: "+2348000000000" });
   setAgentId(biz.id, "agent_123");
+  setBusinessFields(biz.id, { onboarded: 1 });
   alertBus.on(`business:${biz.id}`, (a: OwnerAlert) => alerts.push(a));
-  server = createApp().listen(0);
-  await new Promise((r) => server.once("listening", r));
-  base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  owner = client(base);
+  owner.setToken(biz.ownerToken);
 });
 
-after(() => server.close());
+after(() => stopTestServer(server));
 
-const owner = (path: string, method = "GET", body?: unknown) =>
-  fetch(base + path, { method, headers: { Authorization: `Bearer ${biz.ownerToken}`, "Content-Type": "application/json" }, body: body && JSON.stringify(body) });
 const tool = (path: string, body: unknown, secret = biz.toolSecret) =>
-  fetch(`${base}/tools/${biz.id}/${path}`, { method: "POST", headers: { "x-tool-secret": secret, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  client(base).req(`/tools/${biz.id}/${path}`, "POST", body, { "x-tool-secret": secret });
 
 test("owner endpoints require a valid token", async () => {
-  assert.equal((await fetch(`${base}/api/business`)).status, 401);
-  assert.equal((await owner("/api/business")).status, 200);
+  assert.equal((await client(base).req("/api/business")).status, 401);
+  assert.equal((await owner.req("/api/business")).status, 200);
 });
 
 test("tool endpoints require the tool secret", async () => {
@@ -41,19 +37,19 @@ test("tool endpoints require the tool secret", async () => {
 });
 
 test("full call flow: lookup, order, escalate, owner answers, AI learns", async () => {
-  await owner("/api/products", "POST", { name: "Jollof Rice and Chicken", priceNaira: 3500 });
-  const fried = await (await owner("/api/products", "POST", { name: "Fried Rice", priceNaira: 3000 })).json();
-  await owner(`/api/products/${fried.id}`, "PATCH", { available: false });
-  await owner("/api/faqs", "POST", { question: "Do you deliver to Lekki?", answer: "Yes, ₦2,500 to Lekki." });
+  await owner.req("/api/products", "POST", { name: "Jollof Rice and Chicken", priceNaira: 3500 });
+  const fried = (await owner.req("/api/products", "POST", { name: "Fried Rice", priceNaira: 3000 })).body;
+  await owner.req(`/api/products/${fried.id}`, "PATCH", { available: false });
+  await owner.req("/api/faqs", "POST", { question: "Do you deliver to Lekki?", answer: "Yes, ₦2,500 to Lekki." });
 
-  const info = await (await tool("business-info", { question: "una dey deliver to Lekki?" })).json();
+  const info = (await tool("business-info", { question: "una dey deliver to Lekki?" })).body;
   assert.equal(info.answers[0].answer, "Yes, ₦2,500 to Lekki.");
   assert.equal(info.menu.find((m: any) => m.name === "Fried Rice").available_today, false);
 
-  const soldOut = await (await tool("order", { customer_name: "Chidi", items: [{ name: "fried rice", quantity: 1 }], delivery_address: "Yaba" })).json();
+  const soldOut = (await tool("order", { customer_name: "Chidi", items: [{ name: "fried rice", quantity: 1 }], delivery_address: "Yaba" })).body;
   assert.equal(soldOut.ok, false);
 
-  const order = await (
+  const order = (
     await tool("order", {
       customer_name: "Chidi",
       items: [{ name: "jollof rice", quantity: 2 }],
@@ -61,26 +57,30 @@ test("full call flow: lookup, order, escalate, owner answers, AI learns", async 
       caller_phone: "+2348011111111",
       conversation_id: "{{system__conversation_id}}",
     })
-  ).json();
+  ).body;
   assert.equal(order.ok, true);
   assert.equal(order.total, "₦7,000");
+  await settle();
   assert.equal(alerts.at(-1)?.kind, "order");
 
-  const unknown = await (await tool("business-info", { question: "do you cater for weddings of 300 guests?" })).json();
+  const unknown = (await tool("business-info", { question: "do you cater for weddings of 300 guests?" })).body;
   assert.equal(unknown.answers.length, 0);
 
-  const escalated = await (
+  const escalated = (
     await tool("escalate", { question: "Do you cater for weddings of 300 guests?", summary: "Wedding on Saturday", urgency: "urgent", customer_name: "Ngozi", caller_phone: "+2348022222222" })
-  ).json();
+  ).body;
   assert.match(escalated.say_to_caller, /within 10 minutes/);
+  await settle();
   assert.equal(alerts.at(-1)?.mode, "ring");
 
-  const [esc] = await (await owner("/api/escalations?status=open")).json();
+  const [esc] = (await owner.req("/api/escalations?status=open")).body;
   assert.equal(esc.customer_phone, "+2348022222222");
-  const resolved = await (await owner(`/api/escalations/${esc.id}`, "PATCH", { status: "resolved", ownerAnswer: "Yes, we cater for events up to 500 guests. Call for a quote.", saveAsFaq: true })).json();
-  assert.equal(resolved.status, "resolved");
+  const resolved = (
+    await owner.req(`/api/escalations/${esc.id}`, "PATCH", { status: "resolved", ownerAnswer: "Yes, we cater for events up to 500 guests. Call for a quote.", saveAsFaq: true })
+  ).body;
+  assert.equal(resolved.escalation.status, "resolved");
 
-  const learned = await (await tool("business-info", { question: "can you cater for a wedding?" })).json();
+  const learned = (await tool("business-info", { question: "can you cater for a wedding?" })).body;
   assert.match(learned.answers[0].answer, /events up to 500 guests/);
 });
 
@@ -95,20 +95,16 @@ test("post-call webhook stores the call and counts minutes", async () => {
       analysis: { transcript_summary: "Chidi ordered 2 jollof.", call_successful: "success" },
     },
   });
-  const t = Math.floor(Date.now() / 1000);
-  const sig = createHmac("sha256", "whsec").update(`${t}.${body}`).digest("hex");
-  const bad = await fetch(`${base}/webhooks/elevenlabs/post-call`, { method: "POST", headers: { "elevenlabs-signature": `t=${t},v0=bad` }, body });
-  assert.equal(bad.status, 401);
-  const res = await fetch(`${base}/webhooks/elevenlabs/post-call`, { method: "POST", headers: { "Content-Type": "application/json", "elevenlabs-signature": `t=${t},v0=${sig}` }, body });
-  assert.equal(res.status, 200);
+  const anon = client(base);
+  assert.equal((await anon.req("/webhooks/elevenlabs/post-call", "POST", body, { "elevenlabs-signature": "t=1,v0=bad" })).status, 401);
+  assert.equal((await anon.req("/webhooks/elevenlabs/post-call", "POST", body, { "elevenlabs-signature": signElevenLabs(body) })).status, 200);
 
-  const calls = await (await owner("/api/calls")).json();
+  const calls = (await owner.req("/api/calls")).body;
   assert.equal(calls[0].summary, "Chidi ordered 2 jollof.");
-  const { usage } = await (await owner("/api/business")).json();
+  const { usage } = (await owner.req("/api/business")).body;
   assert.equal(usage.minutesUsed, 2);
 });
 
 test("settings validation rejects bad input", async () => {
-  const res = await owner("/api/business", "PUT", { settings: { callbackMinutes: -5 } });
-  assert.equal(res.status, 400);
+  assert.equal((await owner.req("/api/business", "PUT", { settings: { callbackMinutes: -5 } })).status, 400);
 });

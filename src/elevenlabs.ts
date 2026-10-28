@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { config } from "./config.js";
-import type { Business } from "./db.js";
+import { greetingFor, type Business } from "./db.js";
 
 const API = "https://api.elevenlabs.io/v1";
 
@@ -34,10 +34,15 @@ export function buildSystemPrompt(b: Business): string {
           "Taking orders:",
           "- Collect: items and quantities, the caller's name, delivery address (or pickup), and any notes.",
           "- Read the order back and get a clear yes before calling `place_order`.",
-          "- After `place_order`, tell the caller the total it returns and the payment instructions it returns.",
+          "- After `place_order`, tell the caller the order number and total it returns, then say exactly what its `payment` field says.",
         ].join("\n")
       : "Do not take orders. If the caller wants to order, call `escalate_to_owner` so the owner calls them back.",
     s.extraRules ? `\nRules from the owner (always follow):\n${s.extraRules}` : null,
+    "",
+    "If any tool says the service is in message-only mode: do not answer questions or take orders. Politely take the caller's name and message, call `escalate_to_owner`, and end the call.",
+    "",
+    "Calls you make:",
+    `- If {{call_purpose}} is "owner_callback", this is NOT an incoming call: you phoned the customer on the owner's behalf about their earlier question "{{callback_question}}". The owner's answer is: "{{owner_answer}}". Give that answer clearly and kindly, then ask if they need anything else (you can take an order).`,
     "",
     "Before ending the call, ask if there is anything else, then thank the caller by name if you know it.",
   ];
@@ -126,14 +131,20 @@ export function buildAgentConfig(b: Business) {
     name: `Pickam - ${b.name}`,
     conversation_config: {
       agent: {
-        first_message: b.settings.greeting,
+        first_message: greetingFor(b),
         language: "en",
+        // Defaults for incoming calls; outbound callbacks fill these in.
+        dynamic_variables: {
+          dynamic_variable_placeholders: { call_purpose: "inbound", callback_question: "none", owner_answer: "none" },
+        },
         prompt: { prompt: buildSystemPrompt(b), llm: config.elevenlabs.llm, tools: buildTools(b) },
       },
       tts: config.elevenlabs.defaultVoiceId ? { voice_id: config.elevenlabs.defaultVoiceId } : undefined,
       // Caps cost per call (pranks, very long chats).
       conversation: { max_duration_seconds: 300 },
     },
+    // Outbound callbacks replace the greeting with one that explains why we are calling.
+    platform_settings: { overrides: { conversation_config_override: { agent: { first_message: true } } } },
     tags: ["pickam", `business:${b.id}`],
   };
 }
@@ -172,4 +183,53 @@ export function verifyWebhookSignature(rawBody: string, header: string | undefin
   const expected = createHmac("sha256", secret).update(`${t}.${rawBody}`).digest("hex");
   const given = Buffer.from(parts.v0);
   return given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
+}
+
+/** Import a Nigerian SIP number into ElevenLabs. Returns its ElevenLabs phone_number_id. */
+export async function importSipNumber(number: string): Promise<string> {
+  const { address, username, password } = config.sip;
+  const trunk = { address, transport: "auto", ...(username ? { credentials: { username, password } } : {}) };
+  const created = await api("/convai/phone-numbers", {
+    method: "POST",
+    body: JSON.stringify({ phone_number: number, label: `Pickam ${number}`, provider: "sip_trunk", inbound_trunk_config: {}, outbound_trunk_config: trunk }),
+  });
+  return created.phone_number_id as string;
+}
+
+/** Route calls on a number to an agent. */
+export const assignNumberToAgent = (phoneNumberId: string, agentId: string) =>
+  api(`/convai/phone-numbers/${phoneNumberId}`, { method: "PATCH", body: JSON.stringify({ agent_id: agentId }) });
+
+/** Have the agent phone a customer, e.g. to deliver the owner's answer. Returns the conversation id if given. */
+export async function startOutboundCall(input: {
+  agentId: string;
+  phoneNumberId: string;
+  to: string;
+  firstMessage: string;
+  variables: Record<string, string>;
+}): Promise<string | null> {
+  const res = await api("/convai/sip-trunk/outbound-call", {
+    method: "POST",
+    body: JSON.stringify({
+      agent_id: input.agentId,
+      agent_phone_number_id: input.phoneNumberId,
+      to_number: input.to,
+      conversation_initiation_client_data: {
+        dynamic_variables: input.variables,
+        conversation_config_override: { agent: { first_message: input.firstMessage } },
+      },
+    }),
+  });
+  return res.conversation_id ?? null;
+}
+
+/** Speech-to-text for owners' WhatsApp voice notes. Nigerian English and Pidgin are handled by Scribe. */
+export async function transcribe(audio: Blob, filename = "voice-note.ogg"): Promise<string> {
+  if (!config.elevenlabs.apiKey) throw new Error("ELEVENLABS_API_KEY is not set");
+  const form = new FormData();
+  form.set("model_id", "scribe_v1");
+  form.set("file", audio, filename);
+  const res = await fetch(`${API}/speech-to-text`, { method: "POST", headers: { "xi-api-key": config.elevenlabs.apiKey }, body: form });
+  if (!res.ok) throw new Error(`ElevenLabs speech-to-text failed: ${res.status} ${await res.text()}`);
+  return ((await res.json()) as { text?: string }).text?.trim() ?? "";
 }

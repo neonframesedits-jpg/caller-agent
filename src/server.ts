@@ -6,6 +6,7 @@ import { getDb } from "./db.js";
 import { apiRouter } from "./routes/api.js";
 import { toolsRouter } from "./routes/tools.js";
 import { webhooksRouter } from "./routes/webhooks.js";
+import { startScheduler } from "./scheduler.js";
 
 export function createApp() {
   const app = express();
@@ -30,5 +31,6 @@ export function createApp() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   getDb();
+  startScheduler();
   createApp().listen(config.port, () => console.log(`Pickam listening on http://localhost:${config.port}`));
 }

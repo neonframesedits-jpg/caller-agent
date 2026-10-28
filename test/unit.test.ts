@@ -5,7 +5,8 @@ import { matchProduct, searchFaqs } from "../src/knowledge.js";
 import { inQuietHours, resolveAlertMode } from "../src/notify.js";
 import { buildSystemPrompt, buildTools, verifyWebhookSignature } from "../src/elevenlabs.js";
 import { defaultSettings, type Business } from "../src/db.js";
-import { usageSummary } from "../src/plans.js";
+import { callCharge } from "../src/plans.js";
+import { normalizePhone } from "../src/phone.js";
 
 const faqs = [
   { id: 1, question: "Do you deliver to Lekki?", answer: "Yes, Lekki delivery is ₦2,500.", source: "owner" as const },
@@ -30,7 +31,7 @@ test("matchProduct maps spoken items to menu items", () => {
 });
 
 test("quiet hours across midnight downgrade non-urgent alerts to digest", () => {
-  const s = { ...defaultSettings("X"), quietHours: { enabled: true, start: "22:00", end: "07:00" } };
+  const s = { ...defaultSettings(), quietHours: { enabled: true, start: "22:00", end: "07:00" } };
   const lagos11pm = new Date("2026-10-28T22:00:00Z"); // 23:00 in Lagos (UTC+1)
   const lagosNoon = new Date("2026-10-28T11:00:00Z");
   assert.equal(inQuietHours(s, lagos11pm), true);
@@ -51,18 +52,27 @@ test("webhook signature verification", () => {
 });
 
 test("agent prompt and tools reflect settings", () => {
-  const b = { id: "b1", name: "Mama Tee's Kitchen", description: "", category: "", location: "Surulere", openingHours: "", deliveryInfo: "", toolSecret: "s", settings: defaultSettings("Mama Tee's Kitchen") } as Business;
+  const b = { id: "b1", name: "Mama Tee's Kitchen", description: "", category: "", location: "Surulere", openingHours: "", deliveryInfo: "", toolSecret: "s", settings: defaultSettings() } as Business;
   const prompt = buildSystemPrompt(b);
   assert.match(prompt, /You are Ada/);
   assert.match(prompt, /within 10 minutes/);
   assert.match(prompt, /Location: Surulere/);
+  assert.match(prompt, /owner_callback/);
   assert.deepEqual(buildTools(b).map((t) => t.name), ["get_business_info", "escalate_to_owner", "place_order"]);
   b.settings.takeOrders = false;
   assert.deepEqual(buildTools(b).map((t) => t.name), ["get_business_info", "escalate_to_owner"]);
 });
 
-test("usage summary bills overage minutes", () => {
-  const u = usageSummary("starter", 75);
-  assert.equal(u.overageMinutes, 15);
-  assert.equal(u.estimatedBillNaira, 20_000 + 15 * 300);
+test("call charges: plan minutes first, then wallet; expired plans pay for everything", () => {
+  const b = { plan: "starter", planExpiresAt: "2099-01-01T00:00:00Z" } as Business;
+  assert.deepEqual(callCharge(b, 3, 50), { overageMinutes: 0, chargeNaira: 0, includedLeftAfter: 7 });
+  assert.deepEqual(callCharge(b, 3, 59), { overageMinutes: 2, chargeNaira: 600, includedLeftAfter: 0 });
+  const expired = { ...b, planExpiresAt: "2000-01-01T00:00:00Z" };
+  assert.equal(callCharge(expired, 2, 0).chargeNaira, 600);
+});
+
+test("Nigerian phone numbers are normalised", () => {
+  for (const n of ["08031234567", "8031234567", "2348031234567", "+234 803 123 4567", "0803-123-4567"]) assert.equal(normalizePhone(n), "+2348031234567");
+  assert.equal(normalizePhone("+447700900123"), "+447700900123");
+  assert.equal(normalizePhone("12345"), null);
 });

@@ -84,15 +84,23 @@ Annual billing gets **2 months free**. Collect payment with Paystack or Flutterw
 - Partnerships with market associations, POS agents and dispatch companies.
 - Pidgin-first marketing on TikTok and Instagram.
 
-## Roadmap (after the MVP in this repo)
+## What's built
 
-- **AI calls the customer back.** The owner types or voice-notes the answer, and Ada calls the customer back with it. The owner never has to make the call.
-- **WhatsApp:** alerts to the owner, plus an order confirmation and payment link sent to the customer after the call.
-- **Paystack payment link by SMS during the call:** "I've sent you a link to pay ₦7,000."
+- **Phone-number login** with SMS codes, plus a 3-step signup: business details, menu and common questions, then the Pickam number.
+- **Billing:** monthly plans and a pay-as-you-go wallet through Paystack. Minutes are metered per call. When plan minutes and wallet both run out, Ada switches to message-only and the owner is alerted.
+- **Missed-callback chasing:** once the promised callback time passes, the owner gets a loud alert, and the customer gets an apology SMS.
+- **WhatsApp alerts**, with SMS as backup.
+- **Automatic number setup** from a pool of numbers, with the call-forwarding codes shown to the owner.
+- **Ada calls the customer back** with the owner's answer.
+- **Paystack payment link by SMS** after an order. The money settles straight to the owner's bank account, and the owner is alerted when it's paid.
+- **Teach Ada on WhatsApp:** swipe-reply to an alert, send "#12 answer", send "sold out jollof", or send any text or voice note.
+- **Daily WhatsApp summary** at the time the owner chooses.
+
+## Later
+
 - **Yoruba, Igbo and Hausa** voices and understanding.
-- **Owner's own voice** (cloned with consent) for a personal touch.
-- **Outbound calls:** order-ready and delivery-on-the-way calls, appointment reminders.
 - **Dispatch integration** (Kwik, Gokada, local riders) so a confirmed order books a rider automatically.
-- **Daily digest SMS:** "Yesterday: 23 calls, 9 orders (₦41,500), 2 callbacks pending."
-- **Proper login** (phone number + OTP), multi-staff accounts and multi-branch businesses.
-- **Compliance:** the Nigeria Data Protection Act 2023 requires telling callers that an AI assistant answers and the call may be recorded (add it to the greeting), a privacy policy, and data retention limits.
+- **Outbound calls** for order-ready and delivery-on-the-way updates, and appointment reminders.
+- **Multi-staff accounts** and multi-branch businesses.
+- **Owner's own voice**, cloned with their consent.
+- **Compliance:** the Nigeria Data Protection Act 2023 requires telling callers that an AI assistant answers and the call may be recorded. The default greeting already says "virtual assistant". Still needed: a privacy policy and data retention limits.

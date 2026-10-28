@@ -2,7 +2,7 @@
 
 **Pickam answers your business phone for you.** It is an AI receptionist for Nigerian small businesses: the jollof seller cooking from her kitchen, the fashion vendor on Instagram, the phone accessories shop, the pharmacy, the event planner.
 
-A customer calls. A warm, natural voice (ElevenLabs) picks up, answers questions from what the owner taught it, and takes the order. When it doesn't know the answer, it says *"Let me get the owner to call you back in 10 minutes"*, and the owner's phone and dashboard go **ping ping, urgent**.
+A customer calls. A warm, natural voice (ElevenLabs) picks up, answers questions from what the owner taught it, and takes the order. When it doesn't know the answer, it says *"Let me get the owner to call you back in 10 minutes"*, and the owner's phone goes **ping ping, urgent** on WhatsApp and the dashboard. The owner replies with the answer, and Ada calls the customer back with it.
 
 ```
 Customer's phone
@@ -13,28 +13,36 @@ Nigerian number (SIP trunk) ──► ElevenLabs Agent (voice + LLM)
                                      ▼
                               Pickam server (this repo)
                                ├─ get_business_info → live menu, prices, sold-out items, saved answers
-                               ├─ place_order       → records order, totals it, alerts owner
-                               ├─ escalate_to_owner → callback request + ring/notify/digest alert + SMS
-                               └─ post-call webhook → transcript, summary, minutes used
+                               ├─ place_order       → records order, texts a Paystack payment link
+                               ├─ escalate_to_owner → callback request + WhatsApp/SMS/dashboard alert
+                               └─ post-call webhook → transcript, summary, minutes billed
                                      │
-                                     ▼
-                              Owner dashboard (phone-friendly web app)
-                               callbacks inbox · orders · calls · menu · answers · settings
+              ┌──────────────────────┼─────────────────────────┐
+              ▼                      ▼                         ▼
+     Owner dashboard          Owner's WhatsApp              Paystack
+     (login by SMS code)      alerts · replies ·            plans · wallet ·
+                              voice notes · daily summary   customer payments
 ```
 
-## What it does
+## Features
 
-- **Answers from the owner's knowledge.** The owner fills in their menu/products, prices, delivery, opening hours and Q&A ("Do you deliver to Lekki?") in their free time. The AI only answers from that and never guesses prices.
-- **Live availability.** Tap *"Mark sold out"* and the AI knows on the very next call.
-- **Takes orders.** It reads the order back, totals it in naira and gives your payment instructions (e.g. your bank account).
-- **Hands off to the owner.** For an unknown question, a complaint, a big order or a special discount, it promises a callback within *X* minutes (you set X) and alerts you:
-  - **ring**: the dashboard keeps pinging until you tap it, plus SMS
-  - **notify**: one ping plus SMS
-  - **digest**: shows quietly in the inbox
-  - Separate settings for urgent, normal and low, plus **quiet hours** when only urgent alerts come through.
-- **Learns.** When you answer a callback in the dashboard, your answer is saved, so next time the AI answers that question by itself.
-- **Speaks like a Nigerian.** Clear Nigerian English, and it switches to Pidgin when the caller speaks Pidgin (configurable).
-- **Call log.** Every call comes with a summary and transcript, plus minutes used against your plan.
+**On the call**
+- **Answers from the owner's knowledge.** Menu, prices, delivery, hours, Q&A and WhatsApp notes. It never guesses prices.
+- **Live availability.** Tap *"Mark sold out"* or send "sold out jollof" on WhatsApp.
+- **Takes orders and texts a payment link.** The customer pays by card, transfer or USSD through Paystack. The money settles straight to the owner's bank account, and the owner is alerted when it's paid.
+- **Speaks like a Nigerian.** Clear Nigerian English, and it switches to Pidgin when the caller does.
+
+**When Ada needs the owner**
+- **Promises a callback** within *X* minutes and alerts the owner. Each urgency level can **ring** (keeps pinging until tapped, plus WhatsApp and SMS), **notify** (WhatsApp, with SMS as backup) or go to the **digest**. Quiet hours hold back everything except urgent.
+- **Owner answers from WhatsApp.** Swipe-reply to the alert with text or a voice note, or send `#12 the answer`. **Ada phones the customer** with the answer, and the answer is saved so she can handle that question herself next time.
+- **Chases missed callbacks.** When the promised time passes, the owner gets a loud reminder and the customer gets a polite "sorry for the delay" SMS.
+- **Teach by voice note.** Any WhatsApp text or voice note, e.g. *"We don't deliver on Sundays"*, becomes knowledge Ada uses.
+- **Daily WhatsApp summary:** *"Yesterday: 23 calls, 9 orders (₦41,500). 2 callbacks pending. Questions Ada couldn't answer: …"*
+
+**Running the business**
+- **Signup by phone number** with an SMS code, then a 3-step setup: business details, menu and common questions by category, then the Pickam number.
+- **Automatic Pickam number** from Pickam's number pool, routed to the business's AI, with the call-forwarding codes the owner dials so their *own* number forwards missed calls to Ada.
+- **Plans and wallet.** 14-day free trial, then monthly plans through Paystack. Minutes are metered per call, and extra minutes come from a prepaid wallet. When both run out, Ada switches to **message-only** (takes name and message, no orders) and the owner is told to top up.
 
 ## Run it locally
 
@@ -45,71 +53,91 @@ npm install
 ```
 
 ```bash
-cp .env.example .env   # then fill in the keys
-```
-
-```bash
-npm run create-business -- "Mama Tee's Kitchen" "Titilayo" "+2348012345678"
+cp .env.example .env
 ```
 
 ```bash
 npm run dev
 ```
 
-Open the dashboard link that `create-business` printed (`http://localhost:3000/?token=...`). Tap **Enable sound** so alerts can ping.
+Open `http://localhost:3000` and log in with any Nigerian number. Without Africa's Talking keys, the login code is printed in the server console. Without keys, everything else works too: the integrations just switch off.
+
+To give test signups a number, add one to the pool:
+
+```bash
+curl -X POST localhost:3000/admin/numbers -H "x-admin-key: change-me" -H "Content-Type: application/json" -d '{"number":"02017001111"}'
+```
 
 ```bash
 npm test
 ```
 
-## Connect the voice (ElevenLabs)
+The tests fake every external API, so they need no keys.
 
-1. Create an ElevenLabs account and API key. Put it in `ELEVENLABS_API_KEY`.
-2. Pick a natural Nigerian-English voice from the ElevenLabs Voice Library and put its id in `ELEVENLABS_DEFAULT_VOICE_ID`.
-3. Expose the server on a public HTTPS URL (in development, `ngrok http 3000`) and set `PUBLIC_URL`.
-4. In the dashboard, open **Settings** and tap **Save**. This creates the ElevenLabs agent with the prompt and the three tools, and updates it on every later save.
-5. In ElevenLabs, under Agents settings, set the **post-call webhook** to `PUBLIC_URL/webhooks/elevenlabs/post-call`. Put its secret in `ELEVENLABS_WEBHOOK_SECRET`.
-6. Test with the agent's web test widget in ElevenLabs before connecting a phone number.
+## Hosting: use Railway, not Vercel
 
-> The ElevenLabs agent API changes often. If agent creation fails, compare `buildAgentConfig` in `src/elevenlabs.ts` with the current [ElevenLabs Agents API docs](https://elevenlabs.io/docs). Newer accounts may need tools created separately and referenced by `tool_ids`.
+Pickam is a long-running server. It keeps a SQLite database file, holds live alert connections open to dashboards, and runs a background job every minute (overdue callbacks, daily summaries). Vercel runs serverless functions with no persistent disk and no always-on process, so the database would be wiped and the background jobs would never run.
 
-## Connect a Nigerian phone number
+**Railway** (or Render or Fly.io) runs it as-is:
 
-ElevenLabs agents accept calls over **SIP trunk** (or Twilio). Twilio doesn't reliably offer Nigerian local numbers, so use a Nigerian voice provider with SIP:
+1. Create a project from this GitHub repo. `railway.json` sets the build, start and health check.
+2. Add a **Volume** mounted at `/data` and set `DATABASE_PATH=/data/pickam.db`.
+3. Set `NODE_ENV=production`, `PUBLIC_URL` (your Railway domain or custom domain), and the keys from `.env.example`.
+4. Keep it to **one instance**. SQLite, the alert stream and the scheduler all live in one process. That's plenty for thousands of businesses. Move to Postgres and a job queue before scaling out.
 
-- **Africa's Talking Voice** (Nigerian numbers, SIP) or another licensed Nigerian SIP provider.
-- Import the number in ElevenLabs (Phone Numbers, SIP trunk) and assign it to the business's agent.
+Budget about $5–20/month on Railway at the start.
 
-**Keep your own number (the killer feature).** The owner doesn't have to change the number printed on their flyers and Instagram bio. They set *conditional call forwarding* on their own SIM so calls they **miss, reject or can't take** go to their Pickam number:
+## Connect the services
 
-| Forward when… | Dial on your phone |
+| Service | What for | Setup |
+|---|---|---|
+| **ElevenLabs** | The voice, outbound callbacks, voice-note transcription | API key. Pick a Nigerian-English voice (`ELEVENLABS_DEFAULT_VOICE_ID`). Set the post-call webhook to `PUBLIC_URL/webhooks/elevenlabs/post-call` and copy its secret. |
+| **SIP provider** (e.g. Africa's Talking Voice) | Nigerian phone numbers | Buy numbers, set `SIP_TRUNK_*`, then add each number with `POST /admin/numbers`. It is imported into ElevenLabs automatically. |
+| **Africa's Talking SMS** | Login codes, SMS alerts, payment links, apology texts | API key and username. Register a sender ID (e.g. `PICKAM`) to avoid DND filtering. |
+| **WhatsApp Cloud API** (Meta) | Owner alerts, replies, voice notes, daily summary | Create an app and a WhatsApp number. Set the webhook to `PUBLIC_URL/webhooks/whatsapp` (subscribe to `messages`) with `WHATSAPP_VERIFY_TOKEN`. Get a **utility template** named `pickam_alert` approved with body `{{1}}` + newline + `{{2}}`. |
+| **Paystack** | Plans, wallet top-ups, customer payments | Secret key. Set the webhook URL to `PUBLIC_URL/webhooks/paystack`. |
+
+> The ElevenLabs agent and phone-number APIs change often. If agent creation, number import or outbound calls fail, compare `src/elevenlabs.ts` with the current [ElevenLabs Agents API docs](https://elevenlabs.io/docs). Newer accounts may need tools created separately and referenced by `tool_ids`.
+
+### Call forwarding (owners keep their own number)
+
+Owners dial one of these on their own SIM. The dashboard shows them with their Pickam number filled in:
+
+| Forward when… | Dial |
 |---|---|
 | No answer | `**61*<pickam number>#` |
 | Busy / rejected | `**67*<pickam number>#` |
 | Switched off / no network | `**62*<pickam number>#` |
 | All of the above | `**004*<pickam number>#` |
+| Turn off | `##004#` |
 
-Test with each network (MTN, Airtel, Glo, 9mobile) whether the original caller's number comes through on forwarded calls. If it doesn't, the AI asks the caller for their number before escalating.
+Test with each network (MTN, Airtel, Glo, 9mobile) whether the original caller's number comes through on forwarded calls. If it doesn't, Ada asks for their number before escalating.
 
 ## Project layout
 
 | Path | What it is |
 |---|---|
-| `src/server.ts` | Express app and startup |
+| `src/server.ts` | Express app, startup, scheduler start |
 | `src/routes/tools.ts` | Endpoints the voice agent calls mid-call (`business-info`, `order`, `escalate`) |
-| `src/routes/webhooks.ts` | ElevenLabs post-call webhook (signature-checked) |
-| `src/routes/api.ts` | Owner dashboard API, live alert stream (SSE), admin onboarding |
-| `src/elevenlabs.ts` | Agent prompt, tool definitions, agent create/update, webhook signatures |
-| `src/knowledge.ts` | Matches callers' questions to saved answers and spoken items to the menu (Pidgin-aware) |
-| `src/notify.ts` | Alert routing: ring/notify/digest, quiet hours (Lagos time), SMS via Africa's Talking |
-| `src/plans.ts` | Plans, included minutes, overage |
+| `src/routes/webhooks.ts` | ElevenLabs post-call, Paystack and WhatsApp webhooks (all signature-checked) |
+| `src/routes/api.ts` | Phone login, owner dashboard API, live alert stream (SSE), admin endpoints |
+| `src/auth.ts` | SMS login codes and sessions |
+| `src/billing.ts`, `src/plans.ts`, `src/paystack.ts` | Plans, wallet, per-call metering, message-only mode, checkouts, order payment links |
+| `src/escalations.ts` | Owner answers, saving them, and Ada's callback call |
+| `src/owner-inbox.ts`, `src/whatsapp.ts` | WhatsApp: alerts, swipe-replies, `#id` answers, menu commands, voice notes |
+| `src/numbers.ts`, `src/phone.ts` | Number pool provisioning, Nigerian number formatting, forwarding codes |
+| `src/notify.ts` | Alert routing: ring/notify/digest, quiet hours, WhatsApp first then SMS |
+| `src/scheduler.ts` | Overdue callback chasing and daily summaries |
+| `src/elevenlabs.ts` | Agent prompt, tools, agent sync, outbound calls, speech-to-text, number import |
+| `src/knowledge.ts` | Matches callers' questions to answers and spoken items to the menu (Pidgin-aware) |
 | `src/db.ts` | SQLite schema and data access |
-| `public/index.html` | Owner dashboard (mobile-first, no build step) |
+| `public/index.html` | Owner dashboard: login, setup wizard, inbox, orders, calls, menu, answers, plan and number, settings |
 | `docs/BUSINESS.md` | Name, pricing, unit economics, go-to-market, roadmap |
 
 ## Security notes
 
-- Each business has its own **owner token** (dashboard) and **tool secret** (sent by ElevenLabs on tool calls). Both are random 192-bit values.
-- Post-call webhooks are rejected unless their HMAC signature matches `ELEVENLABS_WEBHOOK_SECRET`.
-- `POST /admin/businesses` (onboarding) needs the `x-admin-key` header to match `ADMIN_KEY`.
-- Before launch: put the server behind HTTPS, add proper owner login (phone number + OTP), and rate-limit the API.
+- Owners log in with a 6-digit SMS code. Each code expires after 10 minutes and allows 5 tries, and each number can request 5 codes per hour. Sessions last 30 days and are stored hashed.
+- Every webhook is signature-checked: ElevenLabs (HMAC-SHA256), Paystack (HMAC-SHA512) and WhatsApp (HMAC-SHA256 with the app secret).
+- Each business's tool endpoints need its own random tool secret, which only its ElevenLabs agent knows.
+- Paystack payments are applied once per reference, and only if the amount paid matches.
+- Before a large launch, add per-IP rate limiting on `/auth/*` and run the server behind HTTPS (Railway does this for you).

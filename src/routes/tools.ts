@@ -5,6 +5,11 @@ import { timingSafeEqual } from "node:crypto";
 import { createEscalation, createOrder, getBusiness, listFaqs, listProducts, type Business, type OrderItem } from "../db.js";
 import { formatNaira, matchProduct, searchFaqs } from "../knowledge.js";
 import { alertOwner } from "../notify.js";
+import { usageFor } from "../plans.js";
+import { canSendPaymentLinks, sendOrderPaymentLink } from "../billing.js";
+
+const MESSAGE_ONLY =
+  "SERVICE IS IN MESSAGE-ONLY MODE. Do not answer questions or take orders. Take the caller's name and message, call escalate_to_owner, and end the call politely.";
 
 export const toolsRouter = Router();
 
@@ -32,10 +37,14 @@ const dynamicVar = z
 toolsRouter.post("/:businessId/business-info", (req: ToolRequest, res) => {
   const b = req.business!;
   const { question } = z.object({ question: z.string().default("") }).parse(req.body ?? {});
+  if (usageFor(b).mode === "message_only") {
+    res.json({ service_mode: "message_only", guidance: MESSAGE_ONLY });
+    return;
+  }
   const products = listProducts(b.id);
   const matches = searchFaqs(listFaqs(b.id), question);
   res.json({
-    answers: matches.map((m) => ({ question: m.question, answer: m.answer })),
+    answers: matches.map((m) => (m.question ? { question: m.question, answer: m.answer } : { owner_note: m.answer })),
     menu: products.map((p) => ({
       name: p.name,
       price: formatNaira(p.priceNaira),
@@ -82,9 +91,9 @@ toolsRouter.post("/:businessId/escalate", (req: ToolRequest, res) => {
     kind: "escalation",
     urgency: body.urgency,
     title: `${body.customer_name || "A customer"} needs you${customerPhone ? ` (${customerPhone})` : ""}`,
-    body: `${body.question}${body.summary ? `\nContext: ${body.summary}` : ""}\nCall back within ${b.settings.callbackMinutes} min.`,
+    body: `#${esc.id}: ${body.question}${body.summary ? `\nContext: ${body.summary}` : ""}\nCall back within ${b.settings.callbackMinutes} min, or reply to this message with the answer and ${b.settings.agentName} will call them.`,
     refId: esc.id,
-  });
+  }, { escalationId: esc.id });
   res.json({
     ok: true,
     say_to_caller: `The owner has been notified and will call back within ${b.settings.callbackMinutes} minutes${
@@ -106,6 +115,10 @@ toolsRouter.post("/:businessId/order", (req: ToolRequest, res) => {
   const b = req.business!;
   if (!b.settings.takeOrders) {
     res.json({ ok: false, say_to_caller: "Orders are not taken by phone. Call escalate_to_owner so the owner can call back." });
+    return;
+  }
+  if (usageFor(b).mode === "message_only") {
+    res.json({ ok: false, service_mode: "message_only", guidance: MESSAGE_ONLY });
     return;
   }
   const body = orderBody.parse(req.body ?? {});
@@ -138,12 +151,20 @@ toolsRouter.post("/:businessId/order", (req: ToolRequest, res) => {
     body: `${body.customer_name} ${body.caller_phone}: ${lines}. Deliver to: ${body.delivery_address}${body.notes ? `. Notes: ${body.notes}` : ""}`,
     refId: order.id,
   });
+  let payment: string;
+  if (canSendPaymentLinks(b) && body.caller_phone) {
+    // Sent in the background so the caller isn't kept waiting on Paystack.
+    void sendOrderPaymentLink(b, order, body.caller_phone).catch((err) => console.error("[order] payment link failed", err));
+    payment = `A payment link for ${formatNaira(order.totalNaira)} is being sent by SMS to the number they are calling from. They can pay by card, transfer or USSD, and the owner is told as soon as it is paid.`;
+  } else {
+    payment = b.settings.paymentInstructions || "The owner will confirm payment details when they call to confirm the order.";
+  }
   res.json({
     ok: true,
     order_number: order.id,
     total: formatNaira(order.totalNaira),
     items: lines,
-    payment_instructions: b.settings.paymentInstructions || "The owner will confirm payment details when they call to confirm the order.",
+    payment,
     note: b.deliveryInfo ? `Delivery info: ${b.deliveryInfo}` : undefined,
   });
 });
