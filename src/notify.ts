@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { config } from "./config.js";
 import { linkWhatsAppMessage, type AlertMode, type Business, type Urgency } from "./db.js";
+import { sendEmail } from "./email.js";
 import { pushToOwner } from "./push.js";
 import { sendAlertTemplate, whatsappConfigured } from "./whatsapp.js";
 
@@ -48,9 +49,10 @@ export function resolveAlertMode(settings: Business["settings"], urgency: Urgenc
   return mode;
 }
 
-export async function sendSms(to: string, message: string): Promise<void> {
+/** Returns false when SMS isn't set up (no Africa's Talking key) or there is no number. */
+export async function sendSms(to: string, message: string): Promise<boolean> {
   const { username, apiKey, senderId } = config.africasTalking;
-  if (!apiKey || !to) return;
+  if (!apiKey || !to) return false;
   const form = new URLSearchParams({ username, to, message });
   if (senderId) form.set("from", senderId);
   const host = username === "sandbox" ? "api.sandbox.africastalking.com" : "api.africastalking.com";
@@ -60,11 +62,12 @@ export async function sendSms(to: string, message: string): Promise<void> {
     body: form,
   });
   if (!res.ok) throw new Error(`Africa's Talking SMS failed: ${res.status} ${await res.text()}`);
+  return true;
 }
 
 /**
- * Message the owner outside the dashboard: WhatsApp first (if on), SMS as backup.
- * `alsoSms` sends the SMS even when WhatsApp worked (used for "ring" alerts).
+ * Message the owner outside the dashboard: WhatsApp first (if on), then SMS, then email as backups.
+ * `alsoSms` sends the backups even when WhatsApp worked (used for "ring" alerts).
  * Returns the WhatsApp message id, if one was sent.
  */
 export async function messageOwner(business: Business, title: string, details: string, alsoSms = false): Promise<string | null> {
@@ -77,12 +80,18 @@ export async function messageOwner(business: Business, title: string, details: s
       console.error("[notify] WhatsApp failed", err);
     }
   }
+  let smsSent = false;
   if (s.smsAlerts && (!waId || alsoSms)) {
     try {
-      await sendSms(business.ownerPhone, `Pickam: ${title}\n${details}`.slice(0, 459));
+      smsSent = await sendSms(business.ownerPhone, `Pickam: ${title}\n${details}`.slice(0, 459));
     } catch (err) {
       console.error("[notify] SMS failed", err);
     }
+  }
+  if (s.emailAlerts && business.ownerEmail && ((!waId && !smsSent) || alsoSms)) {
+    await sendEmail(business.ownerEmail, `Pickam: ${title}`, { heading: title, lines: [...details.split("\n"), "Open the Pickam app to reply."] }).catch((err) =>
+      console.error("[notify] email failed", err),
+    );
   }
   return waId;
 }

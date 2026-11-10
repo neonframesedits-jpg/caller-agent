@@ -9,6 +9,7 @@ import { toolsRouter } from "./routes/tools.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { startScheduler } from "./scheduler.js";
 import { ensureDemoAgent } from "./demo.js";
+import { syncPoolNumbersFromConfig } from "./numbers.js";
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,9 @@ export function createApp() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   getDb();
   startScheduler();
+  syncPoolNumbersFromConfig()
+    .then((added) => added.length && console.log(`Ada's lines ready: ${added.join(", ")}`))
+    .catch((err) => console.error("[numbers] could not set up POOL_NUMBERS:", err.message));
   ensureDemoAgent()
     .then((id) => id && console.log(`Website demo agent ready: ${id}`))
     .catch((err) => console.error("[demo] could not set up the website demo agent:", err.message));

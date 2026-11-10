@@ -2,7 +2,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
-import { AuthError, requestCode, verifyCode } from "../auth.js";
+import { AuthError, loginMethods, requestCode, verifyCode } from "../auth.js";
+import { emailConfigured, normalizeEmail } from "../email.js";
 import { MIN_TOPUP_NAIRA, foundingOfferFor, setupPayout, startCheckout } from "../billing.js";
 import * as db from "../db.js";
 import { syncAgent } from "../elevenlabs.js";
@@ -23,10 +24,14 @@ const fail = (res: Response, status: number, error: string) => res.status(status
 
 // ---- Phone login ----------------------------------------------------------------------------
 
+const loginId = z.union([z.object({ email: z.string().min(1) }), z.object({ phone: z.string() })]);
+
+apiRouter.get("/auth/methods", (_req, res) => res.json(loginMethods()));
+
 apiRouter.post("/auth/code", async (req, res) => {
-  const { phone } = z.object({ phone: z.string() }).parse(req.body);
+  const id = loginId.parse(req.body);
   try {
-    res.json(await requestCode(phone));
+    res.json(await requestCode(id));
   } catch (err) {
     if (err instanceof AuthError) fail(res, err.status, err.message);
     else throw err;
@@ -34,9 +39,10 @@ apiRouter.post("/auth/code", async (req, res) => {
 });
 
 apiRouter.post("/auth/verify", (req, res) => {
-  const { phone, code } = z.object({ phone: z.string(), code: z.string() }).parse(req.body);
+  const id = loginId.parse(req.body);
+  const { code } = z.object({ code: z.string() }).parse(req.body);
   try {
-    res.json(verifyCode(phone, code));
+    res.json(verifyCode(id, code));
   } catch (err) {
     if (err instanceof AuthError) fail(res, err.status, err.message);
     else throw err;
@@ -112,6 +118,7 @@ apiRouter.get("/api/business", (req: OwnerRequest, res) => {
       payments: paystack.paystackConfigured(),
       whatsapp: whatsappConfigured(),
       minTopUpNaira: MIN_TOPUP_NAIRA,
+      email: emailConfigured(),
       foundingDiscountPercent: foundingOfferFor(b) ? FOUNDING_DISCOUNT_PERCENT : 0,
     },
   });
@@ -141,6 +148,7 @@ const settingsSchema = z
     alerts: z.object({ low: alertMode, normal: alertMode, urgent: alertMode }),
     whatsappAlerts: z.boolean(),
     smsAlerts: z.boolean(),
+    emailAlerts: z.boolean(),
     quietHours: z.object({ enabled: z.boolean(), start: hhmm, end: hhmm }),
     apologySms: z.boolean(),
     aiCallsBack: z.boolean(),
@@ -153,8 +161,29 @@ const settingsSchema = z
   .partial();
 
 apiRouter.put("/api/business", (req: OwnerRequest, res) => {
-  const body = z.object({ profile: profileSchema.optional(), settings: settingsSchema.optional() }).parse(req.body);
-  const b = db.updateBusiness(req.business!.id, body.profile ?? {}, body.settings);
+  const body = z
+    .object({
+      profile: profileSchema.optional(),
+      settings: settingsSchema.optional(),
+      // Contact details can be added once (e.g. the business phone for someone who signed up by email).
+      // The one used to log in can't be changed here.
+      contact: z.object({ ownerPhone: z.string(), ownerEmail: z.string() }).partial().optional(),
+    })
+    .parse(req.body);
+  const current = req.business!;
+  if (body.contact?.ownerPhone && !current.ownerPhone) {
+    const phone = normalizePhone(body.contact.ownerPhone);
+    if (!phone) return void fail(res, 400, "Enter a valid Nigerian phone number.");
+    if (db.getBusinessByOwnerPhone(phone)) return void fail(res, 409, "That number is already used by another Pickam account.");
+    db.setBusinessFields(current.id, { owner_phone: phone });
+  }
+  if (body.contact?.ownerEmail && !current.ownerEmail) {
+    const email = normalizeEmail(body.contact.ownerEmail);
+    if (!email) return void fail(res, 400, "Enter a valid email address.");
+    if (db.getBusinessByOwnerEmail(email)) return void fail(res, 409, "That email is already used by another Pickam account.");
+    db.setBusinessFields(current.id, { owner_email: email });
+  }
+  const b = db.updateBusiness(current.id, body.profile ?? {}, body.settings);
   res.json({ business: publicBusiness(b) });
 });
 
@@ -185,6 +214,7 @@ async function provision(b: db.Business, res: Response) {
 apiRouter.post("/api/onboarding/complete", async (req: OwnerRequest, res) => {
   const b = req.business!;
   if (!b.name) return void fail(res, 400, "Add your business name first.");
+  if (!b.ownerPhone) return void fail(res, 400, "Add your business phone number first.");
   db.setBusinessFields(b.id, { onboarded: 1 });
   await provision(db.getBusiness(b.id)!, res);
 });

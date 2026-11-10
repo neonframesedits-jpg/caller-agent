@@ -24,6 +24,8 @@ export interface Settings {
   whatsappAlerts: boolean;
   /** Send SMS when WhatsApp is off or fails, and always for "ring" alerts. */
   smsAlerts: boolean;
+  /** Email the owner (if they gave an email) when WhatsApp and SMS didn't reach them, and for "ring" alerts. */
+  emailAlerts: boolean;
   /** During quiet hours, everything except "urgent" is held for the digest. 24h "HH:MM", Africa/Lagos time. */
   quietHours: { enabled: boolean; start: string; end: string };
   /** Text the customer an apology if the promised callback time passes. */
@@ -51,6 +53,7 @@ export const defaultSettings = (): Settings => ({
   alerts: { low: "digest", normal: "notify", urgent: "ring" },
   whatsappAlerts: true,
   smsAlerts: true,
+  emailAlerts: true,
   quietHours: { enabled: false, start: "22:00", end: "07:00" },
   apologySms: true,
   aiCallsBack: true,
@@ -75,6 +78,7 @@ export interface Business {
   deliveryInfo: string;
   ownerName: string;
   ownerPhone: string;
+  ownerEmail: string;
   ownerToken: string;
   toolSecret: string;
   agentId: string | null;
@@ -116,6 +120,7 @@ export function openDb(path: string): DatabaseSync {
       delivery_info TEXT NOT NULL DEFAULT '',
       owner_name TEXT NOT NULL DEFAULT '',
       owner_phone TEXT NOT NULL DEFAULT '',
+      owner_email TEXT NOT NULL DEFAULT '',
       owner_token TEXT NOT NULL UNIQUE,
       tool_secret TEXT NOT NULL,
       agent_id TEXT UNIQUE,
@@ -278,7 +283,15 @@ export function openDb(path: string): DatabaseSync {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+  // Columns added after the first release: older databases get them here.
+  ensureColumn(db, "businesses", "owner_email", "owner_email TEXT NOT NULL DEFAULT ''");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS businesses_owner_email ON businesses(owner_email) WHERE owner_email != ''");
   return db;
+}
+
+function ensureColumn(d: DatabaseSync, table: string, column: string, ddl: string) {
+  const cols = d.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) d.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 }
 
 export const randomToken = () => randomBytes(24).toString("base64url");
@@ -299,6 +312,7 @@ function toBusiness(row: Row | undefined): Business | null {
     deliveryInfo: row.delivery_info,
     ownerName: row.owner_name,
     ownerPhone: row.owner_phone,
+    ownerEmail: row.owner_email,
     ownerToken: row.owner_token,
     toolSecret: row.tool_secret,
     agentId: row.agent_id,
@@ -319,19 +333,20 @@ function toBusiness(row: Row | undefined): Business | null {
 
 export const TRIAL_DAYS = 14;
 
-export function createBusiness(input: { name?: string; ownerName?: string; ownerPhone?: string; plan?: string }): Business {
+export function createBusiness(input: { name?: string; ownerName?: string; ownerPhone?: string; ownerEmail?: string; plan?: string }): Business {
   const id = randomUUID();
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `INSERT INTO businesses (id, name, owner_name, owner_phone, owner_token, tool_secret, plan, plan_expires_at, period_start, settings_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO businesses (id, name, owner_name, owner_phone, owner_email, owner_token, tool_secret, plan, plan_expires_at, period_start, settings_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
       input.name ?? "",
       input.ownerName ?? "",
       input.ownerPhone ?? "",
+      input.ownerEmail ?? "",
       randomToken(),
       randomToken(),
       input.plan ?? "trial",
@@ -349,6 +364,8 @@ export const getBusinessByAgentId = (agentId: string) =>
   toBusiness(getDb().prepare("SELECT * FROM businesses WHERE agent_id = ?").get(agentId) as Row);
 export const getBusinessByOwnerPhone = (phone: string) =>
   toBusiness(getDb().prepare("SELECT * FROM businesses WHERE owner_phone = ? AND owner_phone != ''").get(phone) as Row);
+export const getBusinessByOwnerEmail = (email: string) =>
+  toBusiness(getDb().prepare("SELECT * FROM businesses WHERE owner_email = ? AND owner_email != ''").get(email) as Row);
 export const listBusinesses = () => (getDb().prepare("SELECT * FROM businesses").all() as Row[]).map((r) => toBusiness(r)!);
 
 export type BusinessProfile = Pick<
@@ -392,6 +409,8 @@ export function setBusinessFields(
     payout_account_name: string;
     onboarded: number;
     last_digest_date: string;
+    owner_phone: string;
+    owner_email: string;
   }>,
 ) {
   const keys = Object.keys(fields);
@@ -730,6 +749,9 @@ export interface PoolNumber {
 export function addPoolNumber(number: string, elevenlabsId: string | null) {
   getDb().prepare("INSERT INTO phone_numbers (number, elevenlabs_phone_number_id) VALUES (?, ?)").run(number, elevenlabsId);
 }
+
+export const setPoolNumberElevenLabsId = (number: string, id: string) =>
+  getDb().prepare("UPDATE phone_numbers SET elevenlabs_phone_number_id = ? WHERE number = ?").run(id, number);
 
 export const listPoolNumbers = () => getDb().prepare("SELECT * FROM phone_numbers ORDER BY created_at").all() as unknown as PoolNumber[];
 export const getPoolNumberForBusiness = (businessId: string) =>

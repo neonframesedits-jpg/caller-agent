@@ -174,6 +174,9 @@
   .phone-input input { border: 0; box-shadow: none; flex: 1; font: 18px var(--body); padding: 14px; background: none; color: var(--ink); }
   .phone-input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 14%, transparent); }
   .phone-input input:focus { outline: none; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-2); }
+  .seg button { border: 0; background: none; border-radius: 999px; min-height: 40px; font: 600 14px var(--body); color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
   .otp { text-align: center; font: 600 28px ui-monospace, Menlo, monospace !important; letter-spacing: .5em; padding-left: .5em !important; }
   .wizard-top { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
   .wizard-top .progress { flex: 1; margin: 0; }
@@ -200,20 +203,22 @@
     <img class="logo-big" src="/icons/icon-192.png" alt="">
     <div id="loginPhone" class="stack">
       <h1>Welcome to Pickam</h1>
-      <p class="muted">Log in or create your account with your phone number. We'll text you a code.</p>
-      <div style="height:12px"></div>
-      <label class="field"><span>Phone number</span>
+      <p class="muted" id="loginIntro">Log in or create your account. We'll send you a code.</p>
+      <div style="height:8px"></div>
+      <div class="seg" id="loginSeg" hidden><button id="segPhone" onclick="setLoginMode('phone')">Phone</button><button id="segEmail" onclick="setLoginMode('email')">Email</button></div>
+      <label class="field" id="phoneField"><span>Phone number</span>
         <div class="phone-input"><span>🇳🇬 +234</span><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="803 123 4567"></div></label>
+      <label class="field" id="emailField" hidden><span>Email</span><input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></label>
       <button class="btn btn-primary btn-block" onclick="sendCode(this)">Continue</button>
       <p class="small muted center">New here? This also creates your account, with a 14-day free trial.</p>
     </div>
     <div id="loginCode" class="stack" hidden>
       <h1>Enter your code</h1>
-      <p class="muted" id="codeHint">We sent a 6-digit code by SMS.</p>
+      <p class="muted" id="codeHint">We sent you a 6-digit code.</p>
       <div style="height:12px"></div>
       <input id="code" class="input otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
       <button class="btn btn-primary btn-block" onclick="verifyCode(this)">Log in</button>
-      <button class="btn btn-secondary btn-block" onclick="showPhoneStep()">Use a different number</button>
+      <button class="btn btn-secondary btn-block" onclick="showPhoneStep()">Go back</button>
     </div>
   </div>
 </section>
@@ -317,25 +322,41 @@ async function api(path, opts = {}) {
 }
 async function busy(btn, fn) { if (btn) btn.disabled = true; try { return await fn(); } finally { if (btn) btn.disabled = false; } }
 
-// ---- Login ----
-let loginPhone = "";
-function showPhoneStep() { $("loginPhone").hidden = false; $("loginCode").hidden = true; $("phone").focus(); }
+// ---- Login: by phone (SMS code) or email (emailed code), whichever the server can send ----
+let loginId = null, loginMode = "phone", methods = { sms: true, email: false };
+function setLoginMode(mode) {
+  loginMode = mode;
+  $("phoneField").hidden = mode !== "phone"; $("emailField").hidden = mode !== "email";
+  $("segPhone").classList.toggle("on", mode === "phone"); $("segEmail").classList.toggle("on", mode === "email");
+  $(mode === "phone" ? "phone" : "email").focus();
+}
+async function initLogin() {
+  methods = await fetch("/auth/methods").then((r) => r.json()).catch(() => methods);
+  $("loginSeg").hidden = !(methods.sms && methods.email);
+  setLoginMode(methods.sms ? "phone" : "email");
+  if (!methods.sms && !methods.email) $("loginIntro").textContent = "Sign-up opens very soon. Join the waitlist on our homepage and we'll let you know.";
+}
+function showPhoneStep() { $("loginPhone").hidden = false; $("loginCode").hidden = true; }
 async function sendCode(btn) {
-  const raw = val("phone").replace(/\s/g, "");
-  await busy(btn, async () => { const r = await api("/auth/code", { method: "POST", body: { phone: raw.startsWith("0") || raw.startsWith("+") ? raw : "0" + raw } }); loginPhone = r.phone; });
-  $("codeHint").textContent = `We sent a 6-digit code by SMS to ${loginPhone}.`;
-  $("loginPhone").hidden = true; $("loginCode").hidden = false; $("code").focus();
+  let body;
+  if (loginMode === "email") body = { email: val("email").trim() };
+  else { const raw = val("phone").replace(/\s/g, ""); body = { phone: raw.startsWith("0") || raw.startsWith("+") ? raw : "0" + raw }; }
+  const r = await busy(btn, () => api("/auth/code", { method: "POST", body }));
+  loginId = r.email ? { email: r.email } : { phone: r.phone };
+  $("codeHint").textContent = r.email ? `We emailed a 6-digit code to ${r.email}. Check your spam folder if you don't see it.` : `We sent a 6-digit code by SMS to ${r.phone}.`;
+  $("loginPhone").hidden = true; $("loginCode").hidden = false; $("code").value = ""; $("code").focus();
 }
 async function verifyCode(btn) {
-  const r = await busy(btn, () => api("/auth/verify", { method: "POST", body: { phone: loginPhone, code: val("code") } }));
+  const r = await busy(btn, () => api("/auth/verify", { method: "POST", body: { ...loginId, code: val("code") } }));
   token = r.token; lsSet("pickamToken", token); start();
 }
 async function logout(expired) {
   if (!expired && token) await api("/api/logout", { method: "POST", quiet: true }).catch(() => {});
   token = null; lsSet("pickamToken", null); events?.close(); closeSheet();
-  ["app", "wizard"].forEach((id) => ($(id).hidden = true)); $("login").hidden = false; showPhoneStep();
+  ["app", "wizard"].forEach((id) => ($(id).hidden = true)); $("login").hidden = false; showPhoneStep(); initLogin();
 }
 $("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") sendCode(); });
+$("email").addEventListener("keydown", (e) => { if (e.key === "Enter") sendCode(); });
 $("code").addEventListener("input", (e) => { if (e.target.value.length === 6) verifyCode(); });
 
 // ---- Alert sound: a "ping ping" made with WebAudio, so no audio file is needed ----
@@ -496,6 +517,7 @@ async function wizard(step) {
       <h1>Tell us about your business</h1><p class="muted">Ada uses this to answer your customers.</p></div>
       <div class="card form" style="margin-top:24px">
         <label class="field"><span>Business name</span><input id="wName" value="${esc(b.name)}" placeholder="Mama Tee's Kitchen"></label>
+        ${b.ownerPhone ? "" : `<label class="field"><span>Business phone number (the one customers call)</span><div class="phone-input"><span>🇳🇬 +234</span><input id="wPhone" type="tel" inputmode="tel" placeholder="803 123 4567"></div></label>`}
         <label class="field"><span>What do you sell?</span><select id="wCat">${Object.entries(CATEGORIES).map(([k, c]) => `<option value="${k}" ${k === current ? "selected" : ""}>${c.emoji} ${c.label}</option>`).join("")}</select></label>
         <div class="grid-2">
           <label class="field"><span>Your name</span><input id="wOwner" value="${esc(b.ownerName)}" placeholder="Titilayo"></label>
@@ -520,7 +542,13 @@ async function wizard(step) {
 }
 async function wizardSave1(btn) {
   if (!val("wName").trim()) return toast("Enter your business name");
-  await busy(btn, () => api("/api/business", { method: "PUT", body: { profile: { name: val("wName").trim(), category: CATEGORIES[val("wCat")].label, ownerName: val("wOwner"), location: val("wLoc"), openingHours: val("wHours"), deliveryInfo: val("wDel") } } }));
+  let contact;
+  if ($("wPhone")) {
+    const raw = val("wPhone").replace(/\s/g, "");
+    if (raw.replace(/\D/g, "").length < 10) return toast("Enter your business phone number");
+    contact = { ownerPhone: raw.startsWith("0") || raw.startsWith("+") ? raw : "0" + raw };
+  }
+  await busy(btn, () => api("/api/business", { method: "PUT", body: { contact, profile: { name: val("wName").trim(), category: CATEGORIES[val("wCat")].label, ownerName: val("wOwner"), location: val("wLoc"), openingHours: val("wHours"), deliveryInfo: val("wDel") } } }));
   await loadBusiness(); wizard(2);
 }
 async function wizardSave2(btn, nq) {
@@ -636,7 +664,7 @@ const VIEWS = {
   async more() {
     const b = state.business;
     return `<div class="page-head"><h1>More</h1></div>
-      <div class="card"><div class="row"><div class="avatar" style="width:48px;height:48px">${esc(initial(b.name))}</div><div class="grow"><h3 class="truncate">${esc(b.name)}</h3><p class="small muted">${esc(b.ownerPhone)} · ${esc(state.usage.plan.name)}</p></div></div></div>
+      <div class="card"><div class="row"><div class="avatar" style="width:48px;height:48px">${esc(initial(b.name))}</div><div class="grow"><h3 class="truncate">${esc(b.name)}</h3><p class="small muted">${esc(b.ownerPhone || b.ownerEmail)} · ${esc(state.usage.plan.name)}</p></div></div></div>
       <div style="height:16px"></div>
       <div class="card flush list">${MORE.map((m) => `<button class="item" onclick="go('${m.id}')"><div class="avatar">${icon(m.icon, 'style="width:18px;height:18px"')}</div><div class="grow"><b style="display:block">${m.label}</b><span class="small muted" style="display:block;line-height:1.4">${m.desc}</span></div>${icon("chev", 'class="i chev"')}</button>`).join("")}</div>
       <div style="height:16px"></div>
@@ -697,6 +725,10 @@ const VIEWS = {
         ${f("name", "Business name", b.name)}
         <div class="grid-2">${f("category", "What you sell", b.category, "Food, fashion, phones…")}${f("location", "Location", b.location, "Surulere, Lagos")}</div>
         <div class="grid-2">${f("openingHours", "Opening hours", b.openingHours, "Mon–Sat, 9am–8pm")}${f("ownerName", "Your name", b.ownerName)}</div>
+        <div class="grid-2">
+          <label class="field"><span>Business phone</span><input id="cPhone" value="${esc(b.ownerPhone)}" ${b.ownerPhone ? "disabled" : ""} placeholder="0803 123 4567"></label>
+          <label class="field"><span>Email (for alerts)</span><input id="cEmail" type="email" value="${esc(b.ownerEmail)}" ${b.ownerEmail ? "disabled" : ""} placeholder="you@example.com"></label>
+        </div>
         <label class="field"><span>About the business</span><textarea id="description" placeholder="Home-cooked Nigerian meals, made fresh daily.">${esc(b.description)}</textarea></label>
         <label class="field"><span>Delivery</span><textarea id="deliveryInfo" placeholder="Dispatch rider. Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea></label>
       </div></div>
@@ -719,6 +751,7 @@ const VIEWS = {
         ${sw("apologySms", "Apology text if I'm late", "Polite SMS to the customer when the callback time passes.", s.apologySms)}
         ${sw("whatsappAlerts", "WhatsApp alerts", features.whatsapp ? "" : "Coming soon.", s.whatsappAlerts)}
         ${sw("smsAlerts", "SMS backup", "If WhatsApp fails, and always for urgent alerts.", s.smsAlerts)}
+        ${sw("emailAlerts", "Email backup", b.ownerEmail ? `To ${esc(b.ownerEmail)}, when WhatsApp and SMS don't reach you.` : "Add your email above to get alerts by email.", s.emailAlerts)}
       </div></div>
       <div class="group"><h2>Quiet time</h2><div class="card flush list">
         ${sw("qhOn", "Quiet hours", "Only urgent alerts come through.", s.quietHours.enabled)}
@@ -799,12 +832,15 @@ async function saveSettings(btn) {
   const settings = {
     agentName: val("agentName"), greeting: val("greeting"), languageStyle: val("languageStyle"), takeOrders: checked("takeOrders"), paymentLinks: checked("paymentLinks"),
     paymentInstructions: val("paymentInstructions"), extraRules: val("extraRules"), callbackMinutes: Number(val("callbackMinutes")),
-    alerts: { urgent: val("al_urgent"), normal: val("al_normal"), low: val("al_low") }, whatsappAlerts: checked("whatsappAlerts"), smsAlerts: checked("smsAlerts"),
+    alerts: { urgent: val("al_urgent"), normal: val("al_normal"), low: val("al_low") }, whatsappAlerts: checked("whatsappAlerts"), smsAlerts: checked("smsAlerts"), emailAlerts: checked("emailAlerts"),
     aiCallsBack: checked("aiCallsBack"), apologySms: checked("apologySms"),
     quietHours: { enabled: checked("qhOn"), start: val("qhStart"), end: val("qhEnd") }, dailySummary: { enabled: checked("dsOn"), time: val("dsTime") },
   };
   await busy(btn, async () => {
-    await api("/api/business", { method: "PUT", body: { profile, settings } });
+    const contact = {};
+    if (!state.business.ownerPhone && val("cPhone").trim()) contact.ownerPhone = val("cPhone").trim();
+    if (!state.business.ownerEmail && val("cEmail").trim()) contact.ownerEmail = val("cEmail").trim();
+    await api("/api/business", { method: "PUT", body: { profile, settings, contact } });
     try { await api("/api/agent/sync", { method: "POST", quiet: true }); toast("Saved. Ada is up to date."); } catch { toast("Saved. Ada will update shortly."); }
   });
   await loadBusiness();
@@ -817,7 +853,7 @@ new MutationObserver(async () => {
   catch { sel.innerHTML = `<option value="">Couldn't load banks</option>`; }
 }).observe($("view"), { childList: true });
 
-if (token) { lsSet("pickamToken", token); start(); } else { $("login").hidden = false; }
+if (token) { lsSet("pickamToken", token); start(); } else { $("login").hidden = false; initLogin(); }
 </script>
 </body>
 </html>

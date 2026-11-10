@@ -43,3 +43,28 @@ export async function provisionNumber(b: db.Business) {
   db.setBusinessFields(b.id, { phone_number: pool.number });
   return { number: pool.number, forwardingCodes: forwardingCodes(pool.number) };
 }
+
+/**
+ * Make sure every number in POOL_NUMBERS is in the pool and connected to ElevenLabs.
+ * Runs at start-up, so adding Ada's lines is just a Railway variable. Safe to run repeatedly.
+ */
+export async function syncPoolNumbersFromConfig(): Promise<string[]> {
+  const added: string[] = [];
+  const existing = new Map(db.listPoolNumbers().map((n) => [n.number, n]));
+  for (const raw of config.poolNumbers) {
+    const number = normalizePhone(raw);
+    if (!number) {
+      console.error(`[numbers] POOL_NUMBERS has an invalid number: ${raw}`);
+      continue;
+    }
+    const row = existing.get(number);
+    if (!row) {
+      await addNumberToPool(number);
+      added.push(number);
+    } else if (!row.elevenlabs_phone_number_id && config.elevenlabs.apiKey) {
+      db.setPoolNumberElevenLabsId(number, await importSipNumber(number));
+      added.push(number);
+    }
+  }
+  return added;
+}

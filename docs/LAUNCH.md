@@ -93,6 +93,33 @@ Keep that link private, because it contains your admin key.
 - Reply to comments with a video. "Does it work for my salon?" makes a great reply video.
 - After someone joins, the page asks them to share their invite link on WhatsApp. That spreads in vendor groups.
 
+## Email login with Brevo (free, no SMS needed)
+
+Owners can log in with an email code instead of an SMS code. Email is also used for alerts when WhatsApp and SMS can't reach the owner.
+
+1. Sign up at **brevo.com** (free plan: 300 emails a day).
+2. Go to **Senders, Domains & Dedicated IPs → Senders → Add a sender**, enter the email you'll send from, and click the confirmation link Brevo emails you.
+   - An address on your own domain, e.g. `hello@pickam.ng`, lands in inboxes far more reliably than a Gmail address. With Gmail, codes may land in spam.
+3. Go to **SMTP & API → API Keys → Generate a new API key**.
+4. On Railway, add these variables:
+   - `BREVO_API_KEY`: the key
+   - `BREVO_SENDER_EMAIL`: the sender you verified
+5. The login page now shows **Email**. While there's no SMS provider, it shows email only. Once you add Africa's Talking, owners get a choice of **Phone / Email**.
+
+People who sign up by email are asked for their **business phone number** during setup, because that's the number they'll forward to Ada.
+
+## Ada's line (the number calls are forwarded to)
+
+Ada answers calls over the internet, so her line must be a **virtual (SIP/VoIP) number**, not a SIM card in a phone. A SIM card can still be the *owner's* number that forwards to Ada.
+
+1. Get a Nigerian virtual number with SIP access, e.g. from Africa's Talking Voice or a Nigerian VoIP provider. They give you the number plus SIP details (an address, a username and a password).
+2. On Railway, add:
+   - `SIP_TRUNK_ADDRESS`, `SIP_TRUNK_USERNAME`, `SIP_TRUNK_PASSWORD`: from the provider
+   - `POOL_NUMBERS`: the number, e.g. `+2342017001111` (separate several with commas)
+3. Make sure `ELEVENLABS_API_KEY` is set. When the site restarts, Pickam adds the number and connects it to ElevenLabs by itself. Look for "Ada's lines ready" in the Railway **Deploy Logs**.
+4. Ask the provider to send incoming calls for that number to ElevenLabs. In ElevenLabs → **Phone Numbers**, open the number to see the SIP address to give them.
+5. Sign up in `/app` with your own business number. Setup assigns Ada's line and shows your forwarding code. Dial it, ask a friend to call you, and don't pick. Ada answers. 🎉
+
 ## How business owners connect their own number
 
 Owners never change their number. In the Pickam app (**My number & plan**), they choose:

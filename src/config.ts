@@ -48,6 +48,17 @@ export const config = {
     username: env("SIP_TRUNK_USERNAME"),
     password: env("SIP_TRUNK_PASSWORD"),
   },
+  /** Brevo (free: 300 emails/day) for login codes and owner alerts by email. */
+  brevo: {
+    apiKey: env("BREVO_API_KEY"),
+    senderEmail: env("BREVO_SENDER_EMAIL"),
+    senderName: env("BREVO_SENDER_NAME", "Pickam"),
+  },
+  /** Ada's lines, comma-separated (e.g. "+2342017001111,+2342017002222"). Added to the pool at start-up. */
+  poolNumbers: env("POOL_NUMBERS")
+    .split(",")
+    .map((n) => n.trim())
+    .filter(Boolean),
   africasTalking: {
     username: env("AT_USERNAME", "sandbox"),
     apiKey: env("AT_API_KEY"),

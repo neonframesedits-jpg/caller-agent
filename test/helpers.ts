@@ -52,6 +52,7 @@ export async function startTestServer() {
   config.africasTalking.apiKey = "at-key";
   config.whatsapp = { ...config.whatsapp, token: "wa-token", phoneNumberId: "wa-phone", appSecret: "wa-secret", verifyToken: "wa-verify" };
   config.paystack.secretKey = "sk_test";
+  config.brevo = { apiKey: "brevo-key", senderEmail: "hello@pickam.ng", senderName: "Pickam" };
 
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -66,6 +67,7 @@ export async function startTestServer() {
 
   // Sensible defaults for every external service.
   mock(/africastalking/, () => ({ SMSMessageData: { Recipients: [] } }));
+  mock(/api\.brevo\.com/, () => ({ messageId: "<brevo@id>" }));
   mock(/graph\.facebook\.com\/v21\.0\/wa-phone\/messages/, () => ({ messages: [{ id: `wamid.${external.length}` }] }));
   mock(/elevenlabs\.io\/v1\/convai\/agents\/create/, () => ({ agent_id: "agent_test" }));
   mock(/elevenlabs\.io\/v1\/convai\/phone-numbers$/, (c) => ({ phone_number_id: `pn_${c.body.phone_number}` }));
@@ -110,3 +112,8 @@ export function client(base: string) {
   };
   return { req, setToken: (t: string) => (token = t) };
 }
+
+export const emailsTo = (email: string) =>
+  callsTo(/api\.brevo\.com/)
+    .filter((c) => c.body.to?.[0]?.email === email)
+    .map((c) => c.body as { subject: string; textContent: string });
