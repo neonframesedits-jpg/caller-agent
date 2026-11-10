@@ -2,132 +2,328 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pickam Dashboard</title>
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#052e1b">
+<meta name="theme-color" content="#f6f4ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b120e" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Pickam">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#f6f7f4; --card:#fff; --ink:#1b1f1a; --muted:#646b62; --line:#e2e5df; --brand:#0a7a3e; --brand-ink:#fff; --brand-soft:#e3f2e9; --urgent:#c62828; --warn:#b26a00; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#121512; --card:#1b1f1b; --ink:#e9ece7; --muted:#9aa297; --line:#2c312b; --brand:#2fb36a; --brand-ink:#08130c; --brand-soft:#16301f; --urgent:#ff6b6b; --warn:#f0a840; } }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-  header { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:2; }
-  header h1 { font-size:18px; margin:0; } h1 span, h2 span { color:var(--brand); }
-  #bizName { color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  nav { display:flex; gap:4px; padding:8px 16px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--card); }
-  nav button { border:0; background:none; color:var(--muted); padding:8px 12px; border-radius:8px; cursor:pointer; font:inherit; white-space:nowrap; }
-  nav button.active { background:var(--brand); color:var(--brand-ink); }
-  main { max-width:900px; margin:0 auto; padding:16px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
-  .card.soft { background:var(--brand-soft); border-color:transparent; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .muted { color:var(--muted); font-size:13px; }
-  .pill { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); }
-  .pill.urgent { color:var(--urgent); border-color:var(--urgent); } .pill.normal { color:var(--warn); border-color:var(--warn); } .pill.good { color:var(--brand); border-color:var(--brand); }
-  input, textarea, select { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; width:100%; }
-  input[type=checkbox] { width:auto; margin-right:6px; }
-  textarea { min-height:70px; }
-  label { display:block; margin:10px 0 4px; font-weight:600; font-size:13px; }
-  label.check { font-weight:400; font-size:14px; display:flex; align-items:center; }
-  button.btn { font:inherit; border:0; border-radius:8px; padding:8px 14px; background:var(--brand); color:var(--brand-ink); cursor:pointer; }
-  button.ghost { background:none; color:var(--ink); border:1px solid var(--line); }
-  button:disabled { opacity:.6; cursor:default; }
-  .banner { display:none; padding:12px 16px; font-weight:600; }
-  #ring { background:var(--urgent); color:#fff; cursor:pointer; }
-  #limit { background:var(--warn); color:#fff; }
-  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0 16px; }
-  .plans { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
-  .meter { height:8px; background:var(--line); border-radius:99px; overflow:hidden; } .meter > div { height:100%; background:var(--brand); }
-  .big { font-size:26px; font-weight:700; letter-spacing:.5px; }
-  .code { font-family:ui-monospace, Menlo, monospace; font-weight:600; }
-  pre { white-space:pre-wrap; margin:0; font:inherit; }
-  a { color:var(--brand); }
-  #login, #wizard { max-width:520px; margin:48px auto; padding:0 16px; }
-  .opt { display:block; border:1.5px solid var(--line); border-radius:12px; padding:12px 12px 12px 40px; margin:8px 0; cursor:pointer; position:relative; background:var(--card); }
-  .opt.on { border-color:var(--brand); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
-  .opt input { position:absolute; left:12px; top:15px; width:auto; margin:0; }
-  .opt span { display:block; color:var(--muted); font-size:13px; margin-top:2px; }
-  .dial { text-align:center; margin:14px 0 10px; }
-  .dial .code { font-size:clamp(16px, 6vw, 28px); letter-spacing:.5px; white-space:nowrap; }
-  a.btn { display:inline-block; text-decoration:none; text-align:center; font:inherit; border-radius:8px; padding:8px 14px; background:var(--brand); color:var(--brand-ink); }
-  .btn.wide { display:block; width:100%; padding:14px; font-size:17px; font-weight:600; }
-  ol.setup { margin:8px 0 0; padding-left:20px; } ol.setup li { margin:10px 0; }
-  #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:10px; display:none; z-index:5; max-width:90vw; }
+  :root {
+    --bg: #f6f4ee; --surface: #ffffff; --surface-2: #f1eee6; --ink: #0f1a14; --muted: #6b7770; --faint: #9aa59e; --line: #ebe7dd;
+    --brand: #0a7a3e; --brand-ink: #ffffff; --brand-soft: #e4f2e9; --deep: #052e1b; --lime: #c6f36d;
+    --jollof: #f2611d; --jollof-soft: #fdeee5; --danger: #d93025; --danger-soft: #fdecea; --warn: #b26a00; --warn-soft: #fbf1df;
+    --radius: 18px; --radius-sm: 12px; --shadow: 0 1px 2px rgba(15,26,20,.04), 0 8px 24px -12px rgba(15,26,20,.12);
+    --display: "Bricolage Grotesque", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --nav-h: 68px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b120e; --surface: #121a15; --surface-2: #18221c; --ink: #e8ede9; --muted: #93a099; --faint: #6a776f; --line: #1f2a23;
+      --brand: #2fb36a; --brand-ink: #04170c; --brand-soft: #143322; --jollof-soft: #3a1e10; --danger: #ff6b6b; --danger-soft: #3a1515; --warn: #f0a840; --warn-soft: #33260f;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5); }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { font: 15px/1.5 var(--body); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: -.02em; line-height: 1.15; margin: 0; }
+  h1 { font-size: 28px; font-weight: 800; } h2 { font-size: 20px; font-weight: 700; } h3 { font-size: 16px; font-weight: 700; }
+  p { margin: 0; }
+  a { color: var(--brand); text-decoration: none; }
+  svg.i { width: 22px; height: 22px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .muted { color: var(--muted); } .small { font-size: 13px; } .center { text-align: center; }
+  .stack > * + * { margin-top: 12px; } .stack-lg > * + * { margin-top: 24px; }
+  .row { display: flex; align-items: center; gap: 12px; } .row.between { justify-content: space-between; } .grow { flex: 1; min-width: 0; }
+  .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 999px; border: 0;
+    font: 600 15px var(--body); cursor: pointer; text-decoration: none; transition: transform .12s ease, opacity .12s, background .15s; white-space: nowrap; }
+  .btn:active { transform: scale(.97); } .btn:disabled { opacity: .55; cursor: default; }
+  .btn-primary { background: var(--brand); color: var(--brand-ink); }
+  .btn-dark { background: var(--deep); color: #fff; }
+  .btn-secondary { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn-soft { background: var(--brand-soft); color: var(--brand); }
+  .btn-danger { background: var(--danger-soft); color: var(--danger); }
+  .btn-sm { min-height: 36px; padding: 0 14px; font-size: 14px; }
+  .btn-block { width: 100%; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+  .icon-btn.on { background: var(--brand-soft); color: var(--brand); box-shadow: none; }
+  :focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 45%, transparent); outline-offset: 2px; }
+
+  /* Forms */
+  .field { display: block; }
+  .field > span { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .input, .field input, .field select, .field textarea { width: 100%; font: 16px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; transition: border-color .15s, box-shadow .15s; }
+  .field textarea { min-height: 88px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus, .input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 14%, transparent); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 480px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  /* Switch */
+  .switch { position: relative; width: 48px; height: 28px; flex: none; }
+  .switch input { opacity: 0; position: absolute; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background .2s; }
+  .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+  .switch input:checked + span { background: var(--brand); }
+  .switch input:checked + span::after { transform: translateX(20px); }
+
+  /* Surfaces */
+  .card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .card.flush { padding: 0; overflow: hidden; }
+  .card.hero { background: var(--deep); color: #fff; box-shadow: none; }
+  .card.hero .muted { color: rgba(255,255,255,.7); }
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; margin: 28px 4px 12px; }
+  .section-title h2 { font-size: 18px; }
+  .list > * + * { border-top: 1px solid var(--line); }
+  .item { display: flex; align-items: center; gap: 14px; padding: 16px 20px; background: none; border: 0; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+  .item .chev { color: var(--faint); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .avatar.warm { background: var(--jollof-soft); color: var(--jollof); }
+  .avatar.danger { background: var(--danger-soft); color: var(--danger); }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+  .badge.green { background: var(--brand-soft); color: var(--brand); } .badge.red { background: var(--danger-soft); color: var(--danger); }
+  .badge.amber { background: var(--warn-soft); color: var(--warn); } .badge.orange { background: var(--jollof-soft); color: var(--jollof); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .stat { background: rgba(255,255,255,.07); border-radius: 14px; padding: 12px; }
+  .stat b { display: block; font: 700 22px var(--display); letter-spacing: -.02em; }
+  .stat span { font-size: 12px; color: rgba(255,255,255,.65); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 4px rgba(198,243,109,.18); display: inline-block; }
+  .status-dot.off { background: var(--jollof); box-shadow: 0 0 0 4px rgba(242,97,29,.18); }
+  .empty { text-align: center; padding: 40px 24px; }
+  .empty .bubble { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 14px; background: var(--brand-soft); color: var(--brand); }
+  .empty .bubble svg.i { width: 28px; height: 28px; }
+  .empty h3 { margin-bottom: 6px; }
+  .meter { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; } .meter > div { height: 100%; background: var(--brand); border-radius: 999px; }
+  .divider { height: 1px; background: var(--line); margin: 18px 0; }
+
+  /* Setup steps */
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { display: flex; align-items: center; gap: 14px; padding: 14px 0; }
+  .steps .btn { flex: none; }
+  .steps li + li { border-top: 1px solid var(--line); }
+  .steps .num { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+  .steps li.done .num { background: var(--brand); color: var(--brand-ink); }
+  .steps li.done h3 { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+  .progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 12px; } .progress > div { height: 100%; background: var(--brand); }
+
+  /* Segmented choice + dial code */
+  .choice { display: grid; gap: 10px; }
+  .choice label { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; }
+  .choice label.on { box-shadow: inset 0 0 0 2px var(--brand); background: color-mix(in srgb, var(--brand-soft) 50%, var(--surface)); }
+  .choice input { margin: 3px 0 0; accent-color: var(--brand); width: 18px; height: 18px; flex: none; }
+  .choice b { display: block; } .choice small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .code-box { text-align: center; padding: 22px 16px; border-radius: 16px; background: var(--surface-2); border: 1.5px dashed var(--line); }
+  .code-box { overflow-x: auto; }
+  .code-box .code { font: 700 clamp(17px, 5.6vw, 30px) ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .5px; white-space: nowrap; color: var(--ink); }
+  .kbd { font-family: ui-monospace, Menlo, monospace; font-weight: 600; background: var(--surface-2); padding: 2px 8px; border-radius: 6px; }
+
+  /* Callback card */
+  .cb-head { display: flex; gap: 12px; align-items: center; }
+  .cb-q { font: 600 17px/1.35 var(--display); letter-spacing: -.01em; margin: 14px 0 6px; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; } .actions .btn { flex: 1; }
+
+  /* Settings */
+  .group { margin-top: 28px; } .group > h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-family: var(--body); font-weight: 600; margin: 0 4px 10px; }
+  .set-row { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+  .set-row .grow b { display: block; font-weight: 600; } .set-row .grow small { display: block; color: var(--muted); font-size: 13px; }
+  .card.form { display: grid; gap: 16px; }
+
+  /* App shell */
+  .topbar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.4) blur(12px);
+    padding: calc(env(safe-area-inset-top) + 12px) 20px 12px; display: flex; align-items: center; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 800 20px var(--display); letter-spacing: -.03em; color: var(--ink); }
+  .brand img { width: 32px; height: 32px; border-radius: 10px; }
+  .brand b { color: var(--brand); }
+  main { max-width: 680px; margin: 0 auto; padding: 8px 16px calc(var(--nav-h) + env(safe-area-inset-bottom) + 32px); }
+  .page-head { margin: 8px 4px 20px; } .page-head p { margin-top: 4px; }
+  nav.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; justify-content: space-around; background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: saturate(1.4) blur(16px); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  nav.tabbar button { flex: 1; max-width: 96px; display: grid; justify-items: center; gap: 2px; padding: 6px 0; border: 0; background: none; color: var(--faint); font: 600 11px var(--body); cursor: pointer; position: relative; }
+  nav.tabbar button.active { color: var(--brand); }
+  nav.tabbar .dot { position: absolute; top: 2px; left: calc(50% + 8px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 11px; display: grid; place-items: center; }
+  @media (min-width: 960px) {
+    nav.tabbar { top: 0; right: auto; width: 232px; flex-direction: column; justify-content: flex-start; gap: 4px; padding: 88px 14px 20px; border-top: 0; border-right: 1px solid var(--line); }
+    nav.tabbar button { flex: none; max-width: none; display: flex; gap: 12px; align-items: center; padding: 11px 14px; border-radius: 12px; font-size: 14px; color: var(--muted); }
+    nav.tabbar button.active { background: var(--brand-soft); }
+    nav.tabbar .dot { position: static; margin-left: auto; }
+    .topbar { padding-left: 252px; } main { padding-left: 248px; max-width: 928px; padding-bottom: 48px; }
+  }
+
+  /* Banners, toast, auth */
+  .banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 16px; margin: 4px 0 16px; font-weight: 600; }
+  .banner.ring { background: var(--danger); color: #fff; cursor: pointer; animation: pulse 1.4s infinite; }
+  .banner.limit { background: var(--warn-soft); color: var(--warn); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--danger) 20%, transparent); } }
+  #toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px); transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 14px; font-weight: 500; z-index: 60; max-width: calc(100vw - 32px); transition: opacity .2s, transform .2s; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .auth { min-height: 100dvh; display: grid; place-items: center; padding: 24px 20px; }
+  .auth-card { width: min(420px, 100%); min-width: 0; }
+  .auth { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .auth .logo-big { width: 64px; height: 64px; border-radius: 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .phone-input { display: flex; align-items: center; gap: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); overflow: hidden; }
+  .phone-input span { padding: 0 12px 0 14px; color: var(--muted); font-weight: 600; border-right: 1px solid var(--line); }
+  .phone-input input { border: 0; box-shadow: none; flex: 1; font: 18px var(--body); padding: 14px; background: none; color: var(--ink); }
+  .phone-input:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 14%, transparent); }
+  .phone-input input:focus { outline: none; }
+  .otp { text-align: center; font: 600 28px ui-monospace, Menlo, monospace !important; letter-spacing: .5em; padding-left: .5em !important; }
+  .wizard-top { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .wizard-top .progress { flex: 1; margin: 0; }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(5,20,12,.45); z-index: 40; display: flex; align-items: flex-end; justify-content: center; animation: fade .15s; }
+  .sheet { width: min(560px, 100%); max-height: 88dvh; overflow: auto; background: var(--bg); border-radius: 24px 24px 0 0; padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); animation: up .22s cubic-bezier(.2,.9,.3,1.1); }
+  .sheet .grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); margin: 0 auto 14px; }
+  @media (min-width: 640px) { .sheet-bg { align-items: center; } .sheet { border-radius: 24px; } }
+  @keyframes up { from { transform: translateY(30px); opacity: 0; } } @keyframes fade { from { opacity: 0; } }
+  .transcript p { padding: 10px 14px; border-radius: 14px; background: var(--surface); margin-top: 8px; max-width: 88%; }
+  .transcript p.me { margin-left: auto; background: var(--brand-soft); }
+  .transcript b { display: block; font-size: 12px; color: var(--muted); }
+  .plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .plan-card { background: var(--surface); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+  .plan-card.current { box-shadow: inset 0 0 0 2px var(--brand); }
+  .plan-card .price { font: 800 26px var(--display); letter-spacing: -.02em; }
+  .plan-card .btn { margin-top: auto; }
 </style>
 </head>
 <body>
-<div id="ring" class="banner" onclick="ackRing()">Customer waiting for callback. Tap to silence.</div>
-<div id="limit" class="banner"></div>
-<div id="toast"></div>
 
-<div id="login" hidden>
-  <div class="card">
-    <h2><span>Pick</span>am</h2>
-    <p>Your AI receptionist that picks your calls when you no fit pick.</p>
-    <div id="loginPhone">
-      <label>Your phone number</label><input id="phone" type="tel" placeholder="0801 234 5678" autocomplete="tel">
-      <p><button class="btn" onclick="sendCode(this)">Send me a code</button></p>
+<!-- Login -->
+<section class="auth" id="login" hidden>
+  <div class="auth-card">
+    <img class="logo-big" src="/icons/icon-192.png" alt="">
+    <div id="loginPhone" class="stack">
+      <h1>Welcome to Pickam</h1>
+      <p class="muted">Log in or create your account with your phone number. We'll text you a code.</p>
+      <div style="height:12px"></div>
+      <label class="field"><span>Phone number</span>
+        <div class="phone-input"><span>🇳🇬 +234</span><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="803 123 4567"></div></label>
+      <button class="btn btn-primary btn-block" onclick="sendCode(this)">Continue</button>
+      <p class="small muted center">New here? This also creates your account, with a 14-day free trial.</p>
     </div>
-    <div id="loginCode" hidden>
-      <label>Enter the 6-digit code we sent by SMS</label><input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
-      <p class="row"><button class="btn" onclick="verifyCode(this)">Continue</button><button class="btn ghost" onclick="showPhoneStep()">Change number</button></p>
+    <div id="loginCode" class="stack" hidden>
+      <h1>Enter your code</h1>
+      <p class="muted" id="codeHint">We sent a 6-digit code by SMS.</p>
+      <div style="height:12px"></div>
+      <input id="code" class="input otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••">
+      <button class="btn btn-primary btn-block" onclick="verifyCode(this)">Log in</button>
+      <button class="btn btn-secondary btn-block" onclick="showPhoneStep()">Use a different number</button>
     </div>
   </div>
-</div>
+</section>
 
-<div id="wizard" hidden></div>
+<!-- Signup wizard -->
+<section class="auth" id="wizard" hidden><div class="auth-card" id="wizardBody"></div></section>
 
+<!-- App -->
 <div id="app" hidden>
-  <header><h1><span>Pick</span>am</h1><div id="bizName"></div><button class="btn ghost" onclick="enableSound()" id="soundBtn">Enable sound</button></header>
-  <nav id="tabs"></nav>
-  <main id="view"></main>
+  <header class="topbar">
+    <div class="brand"><img src="/icons/icon-192.png" alt=""><span><b>Pick</b>am</span></div>
+    <div class="grow"></div>
+    <button class="icon-btn" id="soundBtn" onclick="enableSound()" aria-label="Turn on alert sound" title="Alert sound"></button>
+  </header>
+  <main>
+    <div id="banners"></div>
+    <div id="view"></div>
+  </main>
+  <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
 </div>
+<div id="sheetRoot"></div>
+<div id="toast" role="status"></div>
 
 <script>
-const TABS = { inbox: "Callbacks", orders: "Orders", calls: "Calls", menu: "Menu", faqs: "Answers", billing: "My number & plan", settings: "Settings" };
+// ---- Icons ----
+const ICONS = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  orders: '<path d="M6 7h12l1 13H5L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+  calls: '<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  bellOff: '<path d="M8.7 3A6 6 0 0 1 18 8a21 21 0 0 0 .6 5M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7M10.3 21a1.94 1.94 0 0 0 3.4 0M2 2l20 20"/>',
+  chev: '<path d="m9 18 6-6-6-6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M8 7h8M8 11h6"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
+  settings: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  sparkle: '<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
+  wallet: '<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><circle cx="16" cy="14" r="1.3"/>',
+};
+const icon = (name, extra = "") => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${extra}>${ICONS[name]}</svg>`;
+
+const NAV = [
+  { id: "home", label: "Home", icon: "home" },
+  { id: "orders", label: "Orders", icon: "orders" },
+  { id: "calls", label: "Calls", icon: "calls" },
+  { id: "menu", label: "Menu", icon: "menu" },
+  { id: "more", label: "More", icon: "more" },
+];
+const MORE = [
+  { id: "faqs", label: "What Ada knows", desc: "Answers to customers' questions", icon: "book" },
+  { id: "number", label: "Connect your number", desc: "Choose which calls Ada answers", icon: "link" },
+  { id: "plan", label: "Plan & payments", desc: "Minutes, wallet, getting paid", icon: "card" },
+  { id: "settings", label: "Settings", desc: "Ada's voice, alerts, quiet hours", icon: "settings" },
+];
 const CATEGORIES = {
-  food: { label: "Food & catering", questions: ["Do you deliver? How much is delivery?", "How long does delivery take?", "Do you cater for parties and events?", "What time do you stop taking orders?"] },
-  fashion: { label: "Fashion & clothing", questions: ["What sizes do you have?", "Can I return or exchange an item?", "Do you deliver outside Lagos?", "Can I see the item before paying?"] },
-  phones: { label: "Phones, laptops & gadgets", questions: ["Is it brand new or UK used?", "Do you give warranty?", "Do you accept swap?", "Can I pay on delivery?"] },
-  beauty: { label: "Hair, beauty & salon", questions: ["Do I need to book an appointment?", "Do you do home service?", "How long does it take?", "How much is the deposit?"] },
-  health: { label: "Pharmacy & health", questions: ["Do you sell this drug without prescription?", "Do you deliver?", "What time do you close?", "Do you accept HMO?"] },
-  property: { label: "Real estate", questions: ["Is the property still available?", "How much is agency and legal fee?", "When can I inspect?", "Is the price negotiable?"] },
-  other: { label: "Something else", questions: ["Where are you located?", "Do you deliver?", "How do I pay?", "What are your opening hours?"] },
+  food: { label: "Food & catering", emoji: "🍛", questions: ["Do you deliver? How much is delivery?", "How long does delivery take?", "Do you cater for parties and events?", "What time do you stop taking orders?"] },
+  fashion: { label: "Fashion & clothing", emoji: "👗", questions: ["What sizes do you have?", "Can I return or exchange an item?", "Do you deliver outside Lagos?", "Can I see the item before paying?"] },
+  phones: { label: "Phones & gadgets", emoji: "📱", questions: ["Is it brand new or UK used?", "Do you give warranty?", "Do you accept swap?", "Can I pay on delivery?"] },
+  beauty: { label: "Hair, beauty & salon", emoji: "💇🏾‍♀️", questions: ["Do I need to book an appointment?", "Do you do home service?", "How long does it take?", "How much is the deposit?"] },
+  health: { label: "Pharmacy & health", emoji: "💊", questions: ["Do you sell this drug without prescription?", "Do you deliver?", "What time do you close?", "Do you accept HMO?"] },
+  property: { label: "Real estate", emoji: "🏠", questions: ["Is the property still available?", "How much is agency and legal fee?", "When can I inspect?", "Is the price negotiable?"] },
+  other: { label: "Something else", emoji: "✨", questions: ["Where are you located?", "Do you deliver?", "How do I pay?", "What are your opening hours?"] },
 };
 
 let token = new URLSearchParams(location.search).get("token") || lsGet("pickamToken");
-let tab = "inbox", state = {}, audio = null, ringTimer = null, events = null;
+let tab = "home", state = {}, audio = null, ringTimer = null, events = null, openCallbacks = 0;
 
 function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
 function lsSet(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} }
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
-const naira = (n) => "₦" + Number(n).toLocaleString("en-NG");
-const when = (t) => new Date(t.endsWith("Z") || t.includes("T") ? t : t.replace(" ", "T") + "Z").toLocaleString();
+const naira = (n) => "₦" + Math.round(Number(n)).toLocaleString("en-NG");
+const toDate = (t) => new Date(t.endsWith("Z") || t.includes("T") ? t : t.replace(" ", "T") + "Z");
+function ago(t) {
+  const s = (Date.now() - toDate(t).getTime()) / 1000;
+  if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s / 60)} min ago`; if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return toDate(t).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+const isToday = (t) => toDate(t).toDateString() === new Date().toDateString();
+const initial = (s) => (String(s || "?").trim()[0] || "?").toUpperCase();
 const val = (id) => $(id).value;
 const checked = (id) => $(id).checked;
-function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), 4000); }
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3800); }
 
 async function api(path, opts = {}) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = "Bearer " + token;
   const res = await fetch(path, { method: opts.method || "GET", headers, body: opts.body && JSON.stringify(opts.body) });
   if (res.status === 401 && path.startsWith("/api")) { logout(true); throw new Error("unauthorized"); }
-  if (!res.ok) { const e = await res.json().catch(() => ({})); const msg = e.error || "Something went wrong"; if (!opts.quiet) toast(msg); throw new Error(msg); }
+  if (!res.ok) { const e = await res.json().catch(() => ({})); const msg = e.error || "Something went wrong. Please try again."; if (!opts.quiet) toast(msg); throw new Error(msg); }
   return res.status === 204 ? null : res.json();
 }
 async function busy(btn, fn) { if (btn) btn.disabled = true; try { return await fn(); } finally { if (btn) btn.disabled = false; } }
 
 // ---- Login ----
 let loginPhone = "";
-function showPhoneStep() { $("loginPhone").hidden = false; $("loginCode").hidden = true; }
+function showPhoneStep() { $("loginPhone").hidden = false; $("loginCode").hidden = true; $("phone").focus(); }
 async function sendCode(btn) {
-  await busy(btn, async () => { const r = await api("/auth/code", { method: "POST", body: { phone: val("phone") } }); loginPhone = r.phone; });
+  const raw = val("phone").replace(/\s/g, "");
+  await busy(btn, async () => { const r = await api("/auth/code", { method: "POST", body: { phone: raw.startsWith("0") || raw.startsWith("+") ? raw : "0" + raw } }); loginPhone = r.phone; });
+  $("codeHint").textContent = `We sent a 6-digit code by SMS to ${loginPhone}.`;
   $("loginPhone").hidden = true; $("loginCode").hidden = false; $("code").focus();
 }
 async function verifyCode(btn) {
@@ -136,12 +332,18 @@ async function verifyCode(btn) {
 }
 async function logout(expired) {
   if (!expired && token) await api("/api/logout", { method: "POST", quiet: true }).catch(() => {});
-  token = null; lsSet("pickamToken", null); events?.close();
+  token = null; lsSet("pickamToken", null); events?.close(); closeSheet();
   ["app", "wizard"].forEach((id) => ($(id).hidden = true)); $("login").hidden = false; showPhoneStep();
 }
+$("phone").addEventListener("keydown", (e) => { if (e.key === "Enter") sendCode(); });
+$("code").addEventListener("input", (e) => { if (e.target.value.length === 6) verifyCode(); });
 
-// ---- Sound: a "ping ping" made with WebAudio, so no audio file is needed ----
-function enableSound() { audio = audio || new AudioContext(); audio.resume(); ping(); $("soundBtn").textContent = "Sound on"; if ("Notification" in window) Notification.requestPermission(); }
+// ---- Alert sound: a "ping ping" made with WebAudio, so no audio file is needed ----
+function soundIcon() { $("soundBtn").innerHTML = icon(audio ? "bell" : "bellOff"); $("soundBtn").classList.toggle("on", !!audio); }
+function enableSound() {
+  audio = audio || new AudioContext(); audio.resume(); ping(); soundIcon();
+  toast("Alert sound is on. Keep this screen open to hear new callbacks.");
+}
 function ping() {
   if (!audio) return;
   [0, 0.25].forEach((delay) => {
@@ -151,8 +353,9 @@ function ping() {
     o.start(t); o.stop(t + 0.2);
   });
 }
-function startRing() { $("ring").style.display = "block"; if (!ringTimer) { ping(); ringTimer = setInterval(ping, 2000); } }
-function ackRing() { clearInterval(ringTimer); ringTimer = null; $("ring").style.display = "none"; }
+let ringing = false;
+function startRing() { ringing = true; renderBanners(); if (!ringTimer) { ping(); ringTimer = setInterval(ping, 2000); } }
+function ackRing() { clearInterval(ringTimer); ringTimer = null; ringing = false; renderBanners(); }
 
 function listen() {
   events?.close();
@@ -160,7 +363,7 @@ function listen() {
   events.onmessage = (m) => {
     const a = JSON.parse(m.data);
     if (a.mode === "ring") startRing(); else if (a.mode === "notify") ping();
-    if (a.mode !== "digest" && "Notification" in window && Notification.permission === "granted") new Notification(a.title, { body: a.body });
+    if (a.mode !== "digest" && !isStandalone() && "Notification" in window && Notification.permission === "granted" && !pushOn()) new Notification(a.title, { body: a.body });
     refresh();
   };
 }
@@ -171,7 +374,7 @@ const isStandalone = () => matchMedia("(display-mode: standalone)").matches || n
 const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 let installEvent = null;
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvent = e; if (tab === "inbox" && state.business) render(); });
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvent = e; if (tab === "home" && state.business) render(); });
 addEventListener("appinstalled", () => { installEvent = null; toast("Pickam is on your home screen 🎉"); });
 
 async function installApp() {
@@ -194,63 +397,54 @@ async function enablePush(btn) {
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
     await api("/api/push/subscribe", { method: "POST", body: sub.toJSON() });
     lsSet("pickamPush", "1");
-    toast("Alerts are on 🔔 You'll get orders and callbacks on this phone.");
+    toast("Alerts are on 🔔");
   });
   render();
 }
 
-// "Connect your number": the call-forwarding code the owner dials once.
+// ---- Connect your number (call forwarding) ----
 const fwdKey = () => `pickamFwd:${state.business.id}:${state.business.settings.answerMode || "missed"}`;
 const fwdDone = () => lsGet(fwdKey()) === "1";
 function setFwdDone(on) { lsSet(fwdKey(), on ? "1" : null); render(); }
 const telHref = (code) => "tel:" + code.replace(/#/g, "%23");
 async function copyCode(code, btn) {
-  try { await navigator.clipboard.writeText(code); btn.textContent = "Copied ✓ Now open the Phone app"; } catch { prompt("Copy this code:", code); }
+  try { await navigator.clipboard.writeText(code); btn.innerHTML = `${icon("check")} Copied. Now open the Phone app`; } catch { prompt("Copy this code:", code); }
 }
 async function setAnswerMode(mode) {
   await api("/api/business", { method: "PUT", body: { settings: { answerMode: mode } } });
   await loadBusiness(); render();
 }
-function dialButton(code, label) {
-  const c = esc(code);
-  return isIOS
-    ? `<button class="btn wide" onclick="copyCode('${c}', this)">📋 Copy code</button>
-       <p class="muted">iPhone: tap <b>Copy code</b>, open the <b>Phone</b> app, tap the keypad, paste, then press call.</p>`
-    : `<a class="btn wide" href="${telHref(code)}">📞 ${label}</a>
-       <p class="muted">This opens your phone's dialer with the code filled in. Just press call.</p>`;
-}
 function forwardingCard() {
-  const f = state.forwarding, b = state.business;
-  if (!f) return `<div class="card"><b>Connect your number to Ada</b><p class="muted">First, get the line Ada answers on.</p><button class="btn" onclick="getNumber(this)">Get my Pickam line</button></div>`;
+  const f = state.forwarding, b = state.business, ada = esc(b.settings.agentName);
+  if (!f) return `<div class="card center stack"><div class="empty" style="padding:12px 0 0"><div class="bubble">${icon("link")}</div><h3>Get Ada's line first</h3>
+    <p class="muted">This is the line your calls get forwarded to.</p></div><button class="btn btn-primary btn-block" onclick="getNumber(this)">Get Ada's line</button></div>`;
   const mode = b.settings.answerMode || "missed", code = f[mode];
-  const opt = (m, title, text) => `<label class="opt ${mode === m ? "on" : ""}"><input type="radio" name="answerMode" ${mode === m ? "checked" : ""} onchange="setAnswerMode('${m}')"><b>${title}</b><span>${text}</span></label>`;
-  return `<div class="card soft"><b style="font-size:18px">Connect your number to ${esc(b.settings.agentName)}</b>
-    <p class="muted">Customers keep calling <b>your own number</b> (${esc(b.ownerPhone)}). Choose which calls ${esc(b.settings.agentName)} answers:</p>
-    ${opt("missed", "Only calls I miss (recommended)", "You pick when you can. When you don't answer, you're busy, or your phone is off, Ada picks.")}
-    ${opt("all", "Every call", "Your phone won't ring for calls. Ada answers every customer and sends you the order and address.")}
-    <div class="dial"><div class="muted">Dial this once on the phone with ${esc(b.ownerPhone)}</div><div class="code">${esc(code)}</div></div>
-    ${dialButton(code, "Turn on Ada")}
-    <p class="muted">Your phone will show "Call forwarding activated" or similar. <b>Test it:</b> ask a friend to call you${mode === "missed" ? " and don't pick" : ""}. Ada should answer.</p>
-    <label class="check"><input type="checkbox" ${fwdDone() ? "checked" : ""} onchange="setFwdDone(this.checked)">I've done it, and Ada answered my test call</label>
-    <p class="muted" style="margin-top:12px">To turn Ada off, dial <a class="code" href="${isIOS ? "#" : telHref(f.off)}">${f.off}</a>. Ada's line: ${esc(f.number)}. Your network may charge normal airtime for forwarded calls.</p></div>`;
-}
-function setupChecklist() {
-  if (!state.business) return "";
-  const steps = [];
-  if (!fwdDone()) steps.push(`<li><b>Connect your number</b> so Ada answers your customers.<br><button class="btn" style="margin-top:6px" onclick="tab='billing';render()">Set it up</button></li>`);
-  if (!isStandalone()) {
-    steps.push(installEvent
-      ? `<li><b>Install the Pickam app</b> on this phone.<br><button class="btn" style="margin-top:6px" onclick="installApp()">📲 Install app</button></li>`
-      : isIOS
-        ? `<li><b>Install the Pickam app:</b> tap the <b>Share</b> button ⬆️ at the bottom of Safari, then <b>Add to Home Screen</b>.</li>`
-        : `<li><b>Install the Pickam app:</b> open your browser menu <b>⋮</b> and tap <b>Install app</b> or <b>Add to Home screen</b>.</li>`);
-  }
-  if (pushSupported && !pushOn()) {
-    steps.push(isIOS && !isStandalone()
-      ? `<li><b>Turn on order alerts:</b> install the app first (step above), open it from your home screen, then turn on alerts.</li>`
-      : `<li><b>Turn on order alerts</b> so new orders and callbacks pop up on this phone.<br><button class="btn" style="margin-top:6px" onclick="enablePush(this)">🔔 Turn on alerts</button></li>`);
-  }
-  return steps.length ? `<div class="card"><b>Finish setting up</b><ol class="setup">${steps.join("")}</ol></div>` : "";
+  const opt = (m, title, text) => `<label class="${mode === m ? "on" : ""}"><input type="radio" name="answerMode" ${mode === m ? "checked" : ""} onchange="setAnswerMode('${m}')"><span><b>${title}</b><small>${text}</small></span></label>`;
+  const dial = isIOS
+    ? `<button class="btn btn-primary btn-block" onclick="copyCode('${esc(code)}', this)">${icon("copy")} Copy code</button>
+       <p class="small muted center">Open the <b>Phone</b> app, tap Keypad, paste the code and press call.</p>`
+    : `<a class="btn btn-primary btn-block" href="${telHref(code)}">${icon("calls")} Turn on ${ada}</a>
+       <p class="small muted center">Your dialer opens with the code filled in. Just press call.</p>`;
+  return `<div class="stack-lg">
+    <div class="card stack">
+      <h3>Which calls should ${ada} answer?</h3>
+      <div class="choice">
+        ${opt("missed", "Only calls I miss", `You pick when you can. When you don't answer, you're busy or your phone is off, ${ada} picks.`)}
+        ${opt("all", "Every call", `Your phone won't ring. ${ada} answers every customer and sends you the details.`)}
+      </div>
+    </div>
+    <div class="card stack">
+      <h3>Dial this once</h3>
+      <p class="muted small">On the phone with your business number, <b>${esc(b.ownerPhone)}</b>.</p>
+      <div class="code-box"><div class="code">${esc(code)}</div></div>
+      ${dial}
+    </div>
+    <div class="card stack">
+      <div class="row between"><div class="grow"><h3>Test it</h3><p class="muted small">Ask a friend to call you${mode === "missed" ? " and don't pick" : ""}. ${ada} should answer.</p></div>
+        <label class="switch"><input type="checkbox" ${fwdDone() ? "checked" : ""} onchange="setFwdDone(this.checked)"><span></span></label></div>
+      <div class="divider" style="margin:6px 0"></div>
+      <p class="small muted">To turn ${ada} off, dial <span class="kbd">${esc(f.off)}</span>. ${ada}'s line is ${esc(f.number)}. Your network may charge normal airtime for forwarded calls.</p>
+    </div></div>`;
 }
 
 // ---- Startup ----
@@ -260,55 +454,68 @@ async function start() {
   try { await loadBusiness(); } catch { return; }
   if (!state.business.onboarded) return wizard(1);
   $("wizard").hidden = true; $("app").hidden = false;
-  $("bizName").textContent = state.business.name;
-  $("tabs").innerHTML = Object.entries(TABS).map(([k, v]) => `<button data-tab="${k}">${v}</button>`).join("") + `<button onclick="logout()">Log out</button>`;
-  $("tabs").onclick = (e) => { if (e.target.dataset.tab) { tab = e.target.dataset.tab; render(); } };
+  soundIcon();
   const paid = new URLSearchParams(location.search).get("paid");
-  if (paid) { tab = "billing"; toast("Payment received. It can take a minute to show."); setTimeout(refresh, 5000); }
+  if (paid) { tab = "plan"; toast("Payment received. It can take a minute to show."); setTimeout(refresh, 5000); }
   history.replaceState(null, "", location.pathname);
   listen(); render();
 }
 async function refresh() { await loadBusiness().catch(() => {}); render(); }
+function go(id) { tab = id; closeSheet(); render(); scrollTo({ top: 0 }); }
 
-function limitBanner() {
-  const u = state.usage, el = $("limit");
-  if (u && u.mode === "message_only") { el.innerHTML = `${esc(u.reason)} ${esc(state.business.settings.agentName)} is only taking messages. <u style="cursor:pointer" onclick="tab='billing';render()">Renew or top up</u>`; el.style.display = "block"; }
-  else el.style.display = "none";
+function renderNav() {
+  const active = NAV.some((n) => n.id === tab) ? tab : "more";
+  $("tabbar").innerHTML = NAV.map((n) => `<button class="${n.id === active ? "active" : ""}" onclick="go('${n.id}')" aria-label="${n.label}">${icon(n.icon)}<span>${n.label}</span>${n.id === "home" && openCallbacks ? `<span class="dot">${openCallbacks}</span>` : ""}</button>`).join("");
 }
-
+function renderBanners() {
+  const u = state.usage, ada = esc(state.business?.settings.agentName || "Ada");
+  $("banners").innerHTML =
+    (ringing ? `<div class="banner ring" onclick="ackRing(); go('home')">${icon("bell")}<span class="grow">A customer is waiting for your callback</span><span class="small">Tap to view</span></div>` : "") +
+    (u && u.mode === "message_only" ? `<div class="banner limit">${icon("wallet")}<span class="grow">${esc(u.reason)} ${ada} is only taking messages.</span><button class="btn btn-sm btn-dark" onclick="go('plan')">Top up</button></div>` : "");
+}
 async function render() {
-  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  limitBanner();
+  renderNav(); renderBanners();
   $("view").innerHTML = await VIEWS[tab]();
+  renderNav();
 }
+const pageHead = (title, sub, back) => `<div class="page-head">${back ? `<button class="btn btn-sm btn-secondary" style="margin-bottom:14px" onclick="go('more')">‹ Back</button>` : ""}<h1>${title}</h1>${sub ? `<p class="muted">${sub}</p>` : ""}</div>`;
+const empty = (ic, title, text) => `<div class="card empty"><div class="bubble">${icon(ic)}</div><h3>${title}</h3><p class="muted">${text}</p></div>`;
+
+// ---- Sheets ----
+function openSheet(html) { $("sheetRoot").innerHTML = `<div class="sheet-bg" onclick="if (event.target === this) closeSheet()"><div class="sheet"><div class="grab"></div>${html}</div></div>`; }
+function closeSheet() { $("sheetRoot").innerHTML = ""; }
 
 // ---- Signup wizard ----
 async function wizard(step) {
-  $("app").hidden = true; const w = $("wizard"); w.hidden = false;
-  const b = state.business;
-  const head = (n, title) => `<p class="muted">Step ${n} of 3</p><h2>${title}</h2>`;
+  $("app").hidden = true; $("wizard").hidden = false;
+  const b = state.business, w = $("wizardBody");
+  const top = (n) => `<div class="wizard-top">${n > 1 ? `<button class="icon-btn" onclick="wizard(${n - 1})" aria-label="Back">‹</button>` : ""}<div class="progress"><div style="width:${(n / 3) * 100}%"></div></div><span class="small muted">${n}/3</span></div>`;
   if (step === 1) {
-    w.innerHTML = `<div class="card">${head(1, "Tell us about your business")}
-      <label>Business name</label><input id="wName" value="${esc(b.name)}" placeholder="Mama Tee's Kitchen">
-      <label>What do you sell?</label><select id="wCat">${Object.entries(CATEGORIES).map(([k, c]) => `<option value="${k}" ${b.category === c.label ? "selected" : ""}>${c.label}</option>`).join("")}</select>
-      <label>Your name</label><input id="wOwner" value="${esc(b.ownerName)}" placeholder="Titilayo">
-      <label>Location</label><input id="wLoc" value="${esc(b.location)}" placeholder="Surulere, Lagos">
-      <label>Opening hours</label><input id="wHours" value="${esc(b.openingHours)}" placeholder="Mon–Sat 9am–8pm">
-      <label>Delivery</label><textarea id="wDel" placeholder="Dispatch rider. Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea>
-      <p><button class="btn" onclick="wizardSave1(this)">Next</button></p></div>`;
+    const current = Object.entries(CATEGORIES).find(([, c]) => c.label === b.category)?.[0] || "food";
+    w.innerHTML = `${top(1)}<div class="stack">
+      <h1>Tell us about your business</h1><p class="muted">Ada uses this to answer your customers.</p></div>
+      <div class="card form" style="margin-top:24px">
+        <label class="field"><span>Business name</span><input id="wName" value="${esc(b.name)}" placeholder="Mama Tee's Kitchen"></label>
+        <label class="field"><span>What do you sell?</span><select id="wCat">${Object.entries(CATEGORIES).map(([k, c]) => `<option value="${k}" ${k === current ? "selected" : ""}>${c.emoji} ${c.label}</option>`).join("")}</select></label>
+        <div class="grid-2">
+          <label class="field"><span>Your name</span><input id="wOwner" value="${esc(b.ownerName)}" placeholder="Titilayo"></label>
+          <label class="field"><span>Location</span><input id="wLoc" value="${esc(b.location)}" placeholder="Surulere, Lagos"></label>
+        </div>
+        <label class="field"><span>Opening hours</span><input id="wHours" value="${esc(b.openingHours)}" placeholder="Mon–Sat, 9am–8pm"></label>
+        <label class="field"><span>Delivery</span><textarea id="wDel" placeholder="Dispatch rider. Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea></label>
+      </div>
+      <button class="btn btn-primary btn-block" style="margin-top:20px" onclick="wizardSave1(this)">Continue</button>`;
   } else if (step === 2) {
     const cat = Object.values(CATEGORIES).find((c) => c.label === b.category) || CATEGORIES.other;
-    w.innerHTML = `<div class="card">${head(2, "Teach Ada the basics")}
-      <p class="muted">Add a few things you sell and answer what customers always ask. Skip anything; you can add more later.</p>
-      <b>Products or services</b>
-      ${[0, 1, 2].map((i) => `<div class="grid2"><div><label>Item</label><input id="wp${i}" placeholder="${["Jollof rice + chicken", "Fried rice", "Small chops (pack)"][i]}"></div><div><label>Price (₦)</label><input id="wpp${i}" type="number" min="0"></div></div>`).join("")}
-      <p><b>Common questions</b></p>
-      ${cat.questions.map((q, i) => `<label>${esc(q)}</label><input id="wq${i}" data-q="${esc(q)}" placeholder="Your answer">`).join("")}
-      <p class="row"><button class="btn" onclick="wizardSave2(this, ${cat.questions.length})">Next</button><button class="btn ghost" onclick="wizard(1)">Back</button></p></div>`;
+    w.innerHTML = `${top(2)}<div class="stack"><h1>Teach Ada the basics</h1><p class="muted">Add a few things you sell, and answer what customers always ask. You can skip and add more later.</p></div>
+      <h2 style="margin:28px 4px 12px">Products & prices</h2>
+      <div class="card form">${[0, 1, 2].map((i) => `<div class="grid-2"><label class="field"><span>Item</span><input id="wp${i}" placeholder="${["Jollof rice + chicken", "Fried rice", "Small chops (pack)"][i]}"></label><label class="field"><span>Price (₦)</span><input id="wpp${i}" type="number" inputmode="numeric" min="0" placeholder="3500"></label></div>`).join("")}</div>
+      <h2 style="margin:28px 4px 12px">Common questions</h2>
+      <div class="card form">${cat.questions.map((q, i) => `<label class="field"><span>${esc(q)}</span><input id="wq${i}" data-q="${esc(q)}" placeholder="Your answer"></label>`).join("")}</div>
+      <button class="btn btn-primary btn-block" style="margin-top:20px" onclick="wizardSave2(this, ${cat.questions.length})">Continue</button>`;
   } else {
-    w.innerHTML = `<div class="card">${head(3, "Get your Pickam number")}
-      <p>Customers keep calling <b>your own number</b>. You'll dial one short code, and calls you can't pick go to Ada.</p>
-      <p><button class="btn" onclick="wizardFinish(this)">Connect my number</button></p><div id="wNum"></div></div>`;
+    w.innerHTML = `${top(3)}<div class="stack"><h1>Connect your number</h1><p class="muted">Customers keep calling <b>your own number</b>. Dial one short code, and the calls you can't pick go to Ada.</p></div>
+      <div id="wNum" style="margin-top:24px"><button class="btn btn-primary btn-block" onclick="wizardFinish(this)">Set up my line</button></div>`;
   }
 }
 async function wizardSave1(btn) {
@@ -324,163 +531,261 @@ async function wizardSave2(btn, nq) {
   wizard(3);
 }
 async function wizardFinish(btn) {
+  const done = `<button class="btn btn-dark btn-block" style="margin-top:20px" onclick="start()">Go to my dashboard</button>`;
   try {
     await busy(btn, () => api("/api/onboarding/complete", { method: "POST", quiet: true }));
     await loadBusiness();
-    $("wNum").innerHTML = forwardingCard() + `<p><button class="btn" onclick="start()">Go to my dashboard</button></p>`;
+    $("wNum").innerHTML = forwardingCard() + done;
   } catch (e) {
-    $("wNum").innerHTML = `<p class="muted">${esc(e.message)}</p><p><button class="btn" onclick="start()">Go to my dashboard</button></p>`;
+    $("wNum").innerHTML = `<div class="card stack"><h3>Almost there</h3><p class="muted">${esc(e.message)}</p></div>` + done;
   }
-  btn.hidden = true;
 }
 
-// ---- Tabs ----
+// ---- Views ----
+function setupSteps() {
+  const steps = [
+    { done: fwdDone(), title: "Connect your number", text: "So Ada answers your customers.", action: `<button class="btn btn-sm btn-primary" onclick="go('number')">Set up</button>` },
+  ];
+  if (!isStandalone()) steps.push({ done: false, title: "Install the Pickam app",
+    text: installEvent ? "Get Pickam on your home screen." : isIOS ? "Tap Share ⬆️ in Safari, then Add to Home Screen." : "Open your browser menu ⋮, then Install app.",
+    action: installEvent ? `<button class="btn btn-sm btn-primary" onclick="installApp()">Install</button>` : "" });
+  if (pushSupported) steps.push({ done: pushOn(), title: "Turn on order alerts", text: isIOS && !isStandalone() ? "Install the app first, then turn on alerts from it." : "New orders and callbacks pop up on this phone.",
+    action: isIOS && !isStandalone() ? "" : `<button class="btn btn-sm btn-primary" onclick="enablePush(this)">Turn on</button>` });
+  const done = steps.filter((s) => s.done).length;
+  if (done === steps.length) return "";
+  return `<div class="card"><div class="row between"><h3>Finish setting up</h3><span class="small muted">${done} of ${steps.length}</span></div>
+    <div class="progress"><div style="width:${(done / steps.length) * 100}%"></div></div>
+    <ul class="steps" style="margin-top:8px">${steps.map((s, i) => `<li class="${s.done ? "done" : ""}"><span class="num">${s.done ? icon("check", 'style="width:16px;height:16px"') : i + 1}</span>
+      <div class="grow"><h3>${s.title}</h3><p class="small muted">${s.text}</p></div>${s.done ? "" : s.action}</li>`).join("")}</ul></div>`;
+}
+
+function callbackCard(e) {
+  const ada = esc(state.business.settings.agentName), overdue = e.status === "open" && new Date(e.callback_due_at).getTime() < Date.now();
+  const due = new Date(e.callback_due_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `<div class="card">
+    <div class="cb-head"><div class="avatar ${e.urgency === "urgent" || overdue ? "danger" : "warm"}">${esc(initial(e.customer_name || "C"))}</div>
+      <div class="grow"><b>${esc(e.customer_name || "Customer")}</b><p class="small muted truncate">${esc(e.customer_phone || "No number")} · ${ago(e.created_at)}</p></div>
+      ${overdue ? `<span class="badge red">Overdue</span>` : e.urgency === "urgent" ? `<span class="badge red">Urgent</span>` : `<span class="badge amber">By ${due}</span>`}</div>
+    <p class="cb-q">“${esc(e.question)}”</p>
+    ${e.summary ? `<p class="small muted">${esc(e.summary)}</p>` : ""}
+    <label class="field" style="margin-top:14px"><textarea id="ans${e.id}" placeholder="Type your answer. ${ada} can call them back with it." style="min-height:72px"></textarea></label>
+    <div class="toggle-row"><span class="small">${ada} calls them back with my answer</span><label class="switch"><input type="checkbox" id="cb${e.id}" ${state.business.settings.aiCallsBack ? "checked" : ""}><span></span></label></div>
+    <div class="toggle-row" style="padding-top:0"><span class="small">Save so ${ada} knows next time</span><label class="switch"><input type="checkbox" id="save${e.id}" checked><span></span></label></div>
+    <div class="actions">
+      ${e.customer_phone ? `<a class="btn btn-secondary" href="tel:${esc(e.customer_phone)}" onclick="escUpdate(null, ${e.id}, 'acknowledged', true)">${icon("calls")} Call</a>` : ""}
+      <button class="btn btn-primary" onclick="escUpdate(this, ${e.id}, 'resolved')">Send answer</button>
+    </div></div>`;
+}
+
 const VIEWS = {
-  async inbox() {
-    const items = await api("/api/escalations");
-    if (!items.length) return setupChecklist() + `<div class="card muted">No callbacks yet. When Ada can't answer a customer, they show up here.</div>`;
-    const s = state.business.settings, now = Date.now();
-    const cbNote = { calling: "Ada is calling them with your answer", no_number: "No number to call back", not_set_up: "Ada couldn't call (number not set up)", failed: "Call failed, answer sent by SMS" };
-    return setupChecklist() + items.map((e) => {
-      const overdue = e.status === "open" && new Date(e.callback_due_at).getTime() < now;
-      return `<div class="card">
-        <div class="row"><b>#${e.id}</b><span class="pill ${e.urgency}">${e.urgency}</span><span class="pill">${e.status}</span>${overdue ? `<span class="pill urgent">overdue</span>` : ""}
-          <span class="muted">${when(e.created_at)} · call back by ${new Date(e.callback_due_at).toLocaleTimeString()}</span></div>
-        <h3 style="margin:8px 0 4px">${esc(e.question)}</h3>
-        <div>${esc(e.customer_name || "Customer")} ${e.customer_phone ? `· <a href="tel:${esc(e.customer_phone)}">${esc(e.customer_phone)}</a>` : ""}</div>
-        ${e.summary ? `<p class="muted">${esc(e.summary)}</p>` : ""}
-        ${e.status === "resolved" ? `${e.owner_answer ? `<p><b>Your answer:</b> ${esc(e.owner_answer)}</p>` : ""}${e.ai_callback_status ? `<p class="muted">${cbNote[e.ai_callback_status] || ""}</p>` : ""}` : `
-          <label>Your answer</label><textarea id="ans${e.id}" placeholder="Type the answer. Ada can call them back with it."></textarea>
-          <label class="check"><input type="checkbox" id="save${e.id}" checked>Save it so Ada can answer this next time</label>
-          <label class="check"><input type="checkbox" id="cb${e.id}" ${s.aiCallsBack ? "checked" : ""}>Ada calls them back with this answer</label>
-          <div class="row" style="margin-top:8px">
-            ${e.status === "open" ? `<button class="btn ghost" onclick="escUpdate(this, ${e.id}, 'acknowledged')">I'll call them myself</button>` : ""}
-            <button class="btn" onclick="escUpdate(this, ${e.id}, 'resolved')">Send answer</button>
-          </div>`}
-      </div>`; }).join("");
+  async home() {
+    const [items, calls, orders] = await Promise.all([api("/api/escalations"), api("/api/calls"), api("/api/orders")]);
+    const open = items.filter((e) => e.status !== "resolved");
+    openCallbacks = open.length;
+    const todayCalls = calls.filter((c) => isToday(c.created_at)).length;
+    const todayOrders = orders.filter((o) => isToday(o.created_at) && o.status !== "cancelled");
+    const revenue = todayOrders.reduce((s, o) => s + o.total_naira, 0);
+    const b = state.business, ada = esc(b.settings.agentName), live = !!state.forwarding && fwdDone();
+    const hour = new Date().getHours(), hello = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+    const resolved = items.filter((e) => e.status === "resolved").slice(0, 5);
+    return `<div class="page-head"><p class="muted">${hello}${b.ownerName ? `, ${esc(b.ownerName.split(" ")[0])}` : ""}</p><h1>${esc(b.name)}</h1></div>
+      <div class="card hero">
+        <div class="row"><span class="status-dot ${live ? "" : "off"}"></span><b>${live ? `${ada} is answering your calls` : `${ada} isn't connected yet`}</b></div>
+        <p class="small muted" style="margin-top:4px">${live ? (b.settings.answerMode === "all" ? "Every call goes to " + ada + "." : "Calls you miss go to " + ada + ".") : "Connect your number to start."}</p>
+        <div class="stats"><div class="stat"><b>${todayCalls}</b><span>Calls today</span></div><div class="stat"><b>${todayOrders.length}</b><span>Orders today</span></div><div class="stat"><b>${naira(revenue)}</b><span>Sales today</span></div></div>
+      </div>
+      <div style="height:16px"></div>${setupSteps()}
+      <div class="section-title"><h2>Needs you</h2>${open.length ? `<span class="badge red">${open.length}</span>` : ""}</div>
+      ${open.length ? `<div class="stack">${open.map(callbackCard).join("")}</div>` : empty("inbox", "You're all caught up", `When ${ada} can't answer a customer, they'll show up here.`)}
+      ${resolved.length ? `<div class="section-title"><h2>Answered</h2></div><div class="card flush list">${resolved.map((e) => `<div class="item" style="cursor:default"><div class="avatar">${icon("check", 'style="width:18px;height:18px"')}</div><div class="grow"><b class="truncate" style="display:block">${esc(e.question)}</b><p class="small muted truncate">${esc(e.owner_answer || "Handled")}${e.ai_callback_status === "calling" ? ` · ${ada} called back` : ""}</p></div></div>`).join("")}</div>` : ""}`;
   },
   async orders() {
     const items = await api("/api/orders");
-    if (!items.length) return `<div class="card muted">No orders yet.</div>`;
-    const payPill = { paid: `<span class="pill good">paid</span>`, link_sent: `<span class="pill normal">payment link sent</span>`, unpaid: `<span class="pill">unpaid</span>` };
-    return items.map((o) => `
+    const pay = { paid: `<span class="badge green">Paid</span>`, link_sent: `<span class="badge amber">Link sent</span>`, unpaid: `<span class="badge">Unpaid</span>` };
+    const status = { new: `<span class="badge orange">New</span>`, confirmed: `<span class="badge">Confirmed</span>`, delivered: `<span class="badge green">Delivered</span>`, cancelled: `<span class="badge">Cancelled</span>` };
+    return pageHead("Orders", "Orders Ada took on the phone.") + (items.length ? `<div class="stack">${items.map((o) => `
       <div class="card">
-        <div class="row"><b>#${o.id} · ${naira(o.total_naira)}</b><span class="pill">${o.status}</span>${payPill[o.payment_status] || ""}<span class="muted">${when(o.created_at)}</span></div>
-        <div>${o.items.map((i) => `${i.quantity} × ${esc(i.name)}`).join(", ")}</div>
-        <div class="muted">${esc(o.customer_name)} ${esc(o.customer_phone)} · ${esc(o.delivery_address)} ${o.notes ? "· " + esc(o.notes) : ""}</div>
-        <div class="row" style="margin-top:8px">${["confirmed", "delivered", "cancelled"].map((s) => `<button class="btn ghost" onclick="orderStatus(${o.id},'${s}')">${s}</button>`).join("")}</div>
-      </div>`).join("");
+        <div class="row between"><div><h3>${naira(o.total_naira)}</h3><p class="small muted">#${o.id} · ${ago(o.created_at)}</p></div><div class="row" style="gap:6px">${status[o.status] || ""}${pay[o.payment_status] || ""}</div></div>
+        <div class="divider" style="margin:14px 0"></div>
+        <p>${o.items.map((i) => `${i.quantity} × ${esc(i.name)}`).join(" · ")}</p>
+        <p class="small muted" style="margin-top:6px">${esc(o.customer_name || "Customer")}${o.customer_phone ? ` · <a href="tel:${esc(o.customer_phone)}">${esc(o.customer_phone)}</a>` : ""}</p>
+        <p class="small muted">📍 ${esc(o.delivery_address || "Pickup")}${o.notes ? ` · ${esc(o.notes)}` : ""}</p>
+        ${o.status === "cancelled" || o.status === "delivered" ? "" : `<div class="actions">${o.status === "new" ? `<button class="btn btn-sm btn-soft" onclick="orderStatus(${o.id},'confirmed')">Confirm</button>` : ""}<button class="btn btn-sm btn-primary" onclick="orderStatus(${o.id},'delivered')">Delivered</button><button class="btn btn-sm btn-secondary" onclick="orderStatus(${o.id},'cancelled')">Cancel</button></div>`}
+      </div>`).join("")}</div>` : empty("orders", "No orders yet", "When a customer orders on the phone, it shows up here with their address."));
   },
   async calls() {
     const items = await api("/api/calls");
-    return items.length ? items.map((c) => `
-        <div class="card"><div class="row"><b>${esc(c.customer_phone || "Unknown number")}</b><span class="muted">${when(c.created_at)} · ${Math.ceil(c.duration_secs / 60)} min</span></div>
-        <p>${esc(c.summary || "No summary")}</p>
-        <details><summary class="muted" onclick="loadTranscript(this, '${esc(c.conversation_id)}')">Transcript</summary><div></div></details></div>`).join("")
-      : `<div class="card muted">No calls yet.</div>`;
+    return pageHead("Calls", "Every call Ada answered, with a summary.") + (items.length ? `<div class="card flush list">${items.map((c) => `
+      <button class="item" onclick="showCall('${esc(c.conversation_id)}')"><div class="avatar">${icon("calls", 'style="width:18px;height:18px"')}</div>
+        <div class="grow"><div class="row between"><b class="truncate">${esc(c.customer_phone || "Unknown number")}</b><span class="small muted">${ago(c.created_at)}</span></div>
+        <p class="small muted truncate">${esc(c.summary || "No summary")}</p></div>${icon("chev", 'class="i chev"')}</button>`).join("")}</div>`
+      : empty("calls", "No calls yet", "Once your number is connected, every call Ada answers appears here."));
   },
   async menu() {
     const items = await api("/api/products");
-    return `<div class="card"><b>Add item</b><div class="grid2">
-        <div><label>Name</label><input id="pName" placeholder="Jollof rice + chicken"></div>
-        <div><label>Price (₦)</label><input id="pPrice" type="number" min="0" placeholder="3500"></div></div>
-        <label>Description</label><input id="pDesc" placeholder="Comes with plantain">
-        <p><button class="btn" onclick="addProduct()">Add</button></p>
-        <p class="muted">Tip: on WhatsApp, send "sold out jollof" or "available jollof".</p></div>` +
-      items.map((p) => `<div class="card row"><div style="flex:1"><b>${esc(p.name)}</b> · ${naira(p.priceNaira)}<div class="muted">${esc(p.description)}</div></div>
-        <button class="btn ${p.available ? "ghost" : ""}" onclick="toggleProduct(${p.id}, ${!p.available})">${p.available ? "Mark sold out" : "Sold out · restock"}</button>
-        <button class="btn ghost" onclick="delProduct(${p.id})">Delete</button></div>`).join("");
+    return pageHead("Menu", "What you sell and your prices. Ada only quotes these.") + `
+      <button class="btn btn-primary btn-block" onclick="addProductSheet()">${icon("plus")} Add item</button><div style="height:16px"></div>` +
+      (items.length ? `<div class="card flush list">${items.map((p) => `
+        <div class="item" style="cursor:default"><div class="grow"><b style="display:block" class="truncate">${esc(p.name)}</b><p class="small muted">${naira(p.priceNaira)}${p.description ? ` · ${esc(p.description)}` : ""}</p></div>
+          <span class="small ${p.available ? "muted" : ""}" style="${p.available ? "" : "color:var(--danger);font-weight:600"}">${p.available ? "In stock" : "Sold out"}</span>
+          <label class="switch" title="Available today"><input type="checkbox" ${p.available ? "checked" : ""} onchange="toggleProduct(${p.id}, this.checked)"><span></span></label>
+          <button class="icon-btn" onclick="delProduct(${p.id})" aria-label="Delete">${icon("trash", 'style="width:18px;height:18px"')}</button></div>`).join("")}</div>
+        <p class="small muted center" style="margin-top:12px">Tip: on WhatsApp, send “sold out jollof” to switch an item off.</p>`
+      : empty("menu", "Your menu is empty", "Add what you sell so Ada can quote prices and take orders."));
+  },
+  async more() {
+    const b = state.business;
+    return `<div class="page-head"><h1>More</h1></div>
+      <div class="card"><div class="row"><div class="avatar" style="width:48px;height:48px">${esc(initial(b.name))}</div><div class="grow"><h3 class="truncate">${esc(b.name)}</h3><p class="small muted">${esc(b.ownerPhone)} · ${esc(state.usage.plan.name)}</p></div></div></div>
+      <div style="height:16px"></div>
+      <div class="card flush list">${MORE.map((m) => `<button class="item" onclick="go('${m.id}')"><div class="avatar">${icon(m.icon, 'style="width:18px;height:18px"')}</div><div class="grow"><b style="display:block">${m.label}</b><span class="small muted" style="display:block;line-height:1.4">${m.desc}</span></div>${icon("chev", 'class="i chev"')}</button>`).join("")}</div>
+      <div style="height:16px"></div>
+      <div class="card flush"><button class="item" onclick="logout()" style="color:var(--danger)">${icon("logout")}<b>Log out</b></button></div>`;
   },
   async faqs() {
     const items = await api("/api/faqs");
-    const label = { learned: "learned from a callback", whatsapp: "from WhatsApp" };
-    return `<div class="card"><b>Teach Ada an answer</b>
-        <label>Customer asks</label><input id="fQ" placeholder="Do you deliver to Lekki?">
-        <label>Answer</label><textarea id="fA" placeholder="Yes, delivery to Lekki is ₦2,000 and takes about an hour."></textarea>
-        <p><button class="btn" onclick="addFaq()">Save answer</button></p>
-        <p class="muted">Faster: send a WhatsApp text or voice note to the Pickam number, e.g. "We don't deliver on Sundays".</p></div>` +
-      items.map((f) => `<div class="card"><div class="row"><b style="flex:1">${f.question ? esc(f.question) : "Note"}</b>${label[f.source] ? `<span class="pill">${label[f.source]}</span>` : ""}
-        <button class="btn ghost" onclick="delFaq(${f.id})">Delete</button></div><pre>${esc(f.answer)}</pre></div>`).join("");
+    const src = { learned: `<span class="badge green">Learned</span>`, whatsapp: `<span class="badge">WhatsApp</span>` };
+    return pageHead("What Ada knows", "Answers Ada gives customers. She learns from every callback you answer.", true) + `
+      <button class="btn btn-primary btn-block" onclick="addFaqSheet()">${icon("plus")} Teach Ada an answer</button><div style="height:16px"></div>` +
+      (items.length ? `<div class="card flush list">${items.map((f) => `
+        <div class="item" style="cursor:default;align-items:flex-start"><div class="grow"><div class="row" style="gap:8px"><b>${f.question ? esc(f.question) : "Note"}</b>${src[f.source] || ""}</div><p class="small muted" style="margin-top:4px;white-space:pre-wrap">${esc(f.answer)}</p></div>
+          <button class="icon-btn" onclick="delFaq(${f.id})" aria-label="Delete">${icon("trash", 'style="width:18px;height:18px"')}</button></div>`).join("")}</div>
+        <p class="small muted center" style="margin-top:12px">Faster: send a WhatsApp text or voice note, e.g. “We don't deliver on Sundays”.</p>`
+      : empty("book", "Nothing yet", "Add answers to questions customers always ask."));
   },
-  async billing() {
+  async number() {
+    return pageHead("Connect your number", "Customers keep calling your own number. Calls you choose go to Ada.", true) + forwardingCard();
+  },
+  async plan() {
     await loadBusiness();
     const { business: b, usage: u, plans, features } = state;
     const pct = u.plan.includedMinutes ? Math.min(100, (100 * u.minutesUsed) / u.plan.includedMinutes) : 0;
     const ledger = await api("/api/billing/ledger");
-    const number = forwardingCard();
-    const payButtons = features.payments;
-    return number + `
-      <div class="card"><div class="row"><b style="flex:1">${esc(u.plan.name)}</b><span class="pill ${u.active ? "good" : "urgent"}">${u.active ? "active until " + new Date(u.expiresAt).toLocaleDateString() : "expired"}</span></div>
-        <p>${u.minutesUsed} of ${u.plan.includedMinutes} plan minutes used</p><div class="meter"><div style="width:${pct}%"></div></div>
-        <p>Wallet: <b>${naira(u.walletNaira)}</b> <span class="muted">(about ${u.walletMinutes} extra minutes at ${naira(u.plan.overagePerMinuteNaira)}/min)</span></p>
-        ${payButtons ? `<div class="row"><input id="topup" type="number" min="${features.minTopUpNaira}" step="500" placeholder="Amount (min ${naira(features.minTopUpNaira)})" style="max-width:220px"><button class="btn" onclick="topUp(this)">Top up wallet</button></div>` : `<p class="muted">Online payment is not set up on this server yet.</p>`}</div>
-      <div class="plans">${plans.map((p) => `<div class="card"><b>${esc(p.name)}</b><div class="big">${naira(p.priceNaira)}</div><div class="muted">per 30 days</div>
-        ${features.foundingDiscountPercent && p.priceNaira ? `<p><span class="pill good">Founding offer: first month ${naira(p.priceNaira * (100 - features.foundingDiscountPercent) / 100)}</span></p>` : ""}
-        <p>${p.includedMinutes ? `${p.includedMinutes} minutes (~${Math.round(p.includedMinutes / 2)} calls)` : "No minutes included"}<br><span class="muted">then ${naira(p.overagePerMinuteNaira)}/min from wallet</span></p>
-        ${payButtons ? `<button class="btn ${b.plan === p.id ? "ghost" : ""}" onclick="buyPlan(this, '${p.id}')">${b.plan === p.id ? "Renew" : "Choose"}</button>` : ""}</div>`).join("")}</div>
-      <div class="card"><b>Get paid by customers</b>
-        ${b.payoutConnected ? `<p>Connected: <b>${esc(b.payoutAccountName)}</b>. Ada texts customers a payment link after they order, and the money goes straight to your account.</p>`
-          : payButtons ? `<p class="muted">Connect your bank account so Ada can text customers a link to pay for their order.</p>
-            <div class="grid2"><div><label>Bank</label><select id="bank"><option value="">Loading banks…</option></select></div><div><label>Account number</label><input id="acct" inputmode="numeric" maxlength="10"></div></div>
-            <p><button class="btn" onclick="connectBank(this)">Connect account</button></p>` : `<p class="muted">Online payment is not set up on this server yet.</p>`}</div>
-      ${ledger.length ? `<div class="card"><b>Wallet history</b>${ledger.map((l) => `<div class="row" style="justify-content:space-between"><span>${esc(l.reason)} <span class="muted">${when(l.created_at)}</span></span><b>${l.amount_naira > 0 ? "+" : ""}${naira(l.amount_naira)}</b></div>`).join("")}</div>` : ""}`;
+    const pays = features.payments;
+    return pageHead("Plan & payments", "", true) + `
+      <div class="card">
+        <div class="row between"><div><p class="small muted">Current plan</p><h2>${esc(u.plan.name)}</h2></div><span class="badge ${u.active ? "green" : "red"}">${u.active ? "Active until " + new Date(u.expiresAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "Expired"}</span></div>
+        <div style="margin-top:18px" class="row between small"><span>${u.minutesUsed} of ${u.plan.includedMinutes} minutes</span><span class="muted">${u.minutesLeft} left</span></div>
+        <div class="meter" style="margin-top:8px"><div style="width:${pct}%"></div></div>
+        <div class="divider"></div>
+        <div class="row between"><div><p class="small muted">Wallet</p><h2>${naira(u.walletNaira)}</h2><p class="small muted">About ${u.walletMinutes} extra minutes</p></div>
+          ${pays ? `<button class="btn btn-soft" onclick="topUpSheet()">${icon("wallet")} Top up</button>` : ""}</div>
+      </div>
+      <div class="section-title"><h2>Plans</h2>${features.foundingDiscountPercent ? `<span class="badge orange">🔥 First month half price</span>` : ""}</div>
+      <div class="plan-grid">${plans.map((p) => `<div class="plan-card ${b.plan === p.id ? "current" : ""}">
+        <b>${esc(p.name)}</b><div class="price">${naira(p.priceNaira)}<span class="small muted" style="font:500 13px var(--body)"> /month</span></div>
+        ${features.foundingDiscountPercent && p.priceNaira ? `<span class="small" style="color:var(--jollof);font-weight:600">First month ${naira((p.priceNaira * (100 - features.foundingDiscountPercent)) / 100)}</span>` : ""}
+        <p class="small muted">${p.includedMinutes ? `${p.includedMinutes} min · about ${Math.round(p.includedMinutes / 2)} calls` : "Pay per minute from wallet"}<br>Extra minutes ${naira(p.overagePerMinuteNaira)}</p>
+        ${pays ? `<button class="btn btn-sm ${b.plan === p.id ? "btn-secondary" : "btn-primary"}" style="margin-top:10px" onclick="buyPlan(this, '${p.id}')">${b.plan === p.id ? "Renew" : "Choose"}</button>` : ""}</div>`).join("")}</div>
+      ${pays ? "" : `<p class="small muted center" style="margin-top:12px">Online payment is coming soon.</p>`}
+      <div class="section-title"><h2>Get paid by customers</h2></div>
+      <div class="card stack">${b.payoutConnected ? `<div class="row"><div class="avatar">${icon("check", 'style="width:18px;height:18px"')}</div><div class="grow"><b>${esc(b.payoutAccountName)}</b><p class="small muted">Ada texts customers a payment link. Money goes straight to this account.</p></div></div>`
+        : pays ? `<p class="muted small">Connect your bank account so Ada can text customers a link to pay for their order.</p>
+          <label class="field"><span>Bank</span><select id="bank"><option value="">Loading banks…</option></select></label>
+          <label class="field"><span>Account number</span><input id="acct" inputmode="numeric" maxlength="10" placeholder="0123456789"></label>
+          <button class="btn btn-primary btn-block" onclick="connectBank(this)">Connect account</button>` : `<p class="muted small">Coming soon.</p>`}</div>
+      ${ledger.length ? `<div class="section-title"><h2>Wallet history</h2></div><div class="card flush list">${ledger.map((l) => `<div class="item" style="cursor:default"><div class="grow"><b style="display:block">${esc(l.reason)}</b><span class="small muted">${ago(l.created_at)}</span></div><b style="color:${l.amount_naira > 0 ? "var(--brand)" : "var(--ink)"}">${l.amount_naira > 0 ? "+" : ""}${naira(l.amount_naira)}</b></div>`).join("")}</div>` : ""}`;
   },
   async settings() {
     await loadBusiness();
     const { business: b, features } = state, s = b.settings;
-    const modeSel = (k) => `<select id="al_${k}">${["ring", "notify", "digest"].map((m) => `<option ${s.alerts[k] === m ? "selected" : ""}>${m}</option>`).join("")}</select>`;
-    const f = (id, label, v, ph = "") => `<label>${label}</label><input id="${id}" value="${esc(v)}" placeholder="${esc(ph)}">`;
-    const chk = (id, label, on) => `<label class="check"><input type="checkbox" id="${id}" ${on ? "checked" : ""}>${label}</label>`;
-    return `<div class="card"><b>Business</b><div class="grid2">
-        ${f("name", "Business name", b.name)}${f("category", "What you sell", b.category, "Food, fashion, phones…")}
-        ${f("location", "Location", b.location, "Surulere, Lagos")}${f("openingHours", "Opening hours", b.openingHours, "Mon–Sat 9am–8pm")}
-        ${f("ownerName", "Your name", b.ownerName)}<div><label>Your phone (login and alerts)</label><input value="${esc(b.ownerPhone)}" disabled></div></div>
-        <label>About the business</label><textarea id="description">${esc(b.description)}</textarea>
-        <label>Delivery</label><textarea id="deliveryInfo" placeholder="We use dispatch riders. Lagos Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea></div>
-      <div class="card"><b>Your AI receptionist</b><div class="grid2">
-        ${f("agentName", "AI name", s.agentName)}
-        <div><label>Language</label><select id="languageStyle"><option value="pidgin" ${s.languageStyle === "pidgin" ? "selected" : ""}>English + Pidgin when caller uses it</option><option value="english" ${s.languageStyle === "english" ? "selected" : ""}>English only</option></select></div></div>
-        ${f("greeting", "Greeting (leave empty for the default)", s.greeting, b.greetingPreview)}
-        ${chk("takeOrders", "Let Ada take orders", s.takeOrders)}
-        ${chk("paymentLinks", `Text customers a payment link after they order${b.payoutConnected ? "" : " (connect your bank in My number & plan first)"}`, s.paymentLinks)}
-        <label>Payment instructions (used when payment links are off)</label><textarea id="paymentInstructions" placeholder="Pay to GTBank 0123456789, Mama Tee's Kitchen, and send proof on WhatsApp.">${esc(s.paymentInstructions)}</textarea>
-        <label>Rules Ada must follow</label><textarea id="extraRules" placeholder="Never give discounts. Don't promise delivery before 11am.">${esc(s.extraRules)}</textarea></div>
-      <div class="card"><b>When Ada needs you</b>
-        <label>Tell customers you'll call back within (minutes)</label><input id="callbackMinutes" type="number" min="1" value="${s.callbackMinutes}">
-        <div class="grid2"><div><label>Urgent</label>${modeSel("urgent")}</div><div><label>Normal</label>${modeSel("normal")}</div><div><label>Low</label>${modeSel("low")}</div></div>
-        <p class="muted">ring = keeps pinging until you tap it, plus WhatsApp and SMS · notify = one ping plus WhatsApp · digest = shows quietly in the inbox</p>
-        ${chk("whatsappAlerts", `Send alerts to my WhatsApp${features.whatsapp ? "" : " (not set up on this server yet)"}`, s.whatsappAlerts)}
-        ${chk("smsAlerts", "Send SMS if WhatsApp fails (and always for urgent)", s.smsAlerts)}
-        ${chk("aiCallsBack", "When I answer a callback, Ada phones the customer with my answer", s.aiCallsBack)}
-        ${chk("apologySms", "If I miss the callback time, text the customer a polite apology", s.apologySms)}
-        ${chk("qhOn", "Quiet hours (only urgent alerts come through)", s.quietHours.enabled)}
-        <div class="grid2"><div><label>From</label><input id="qhStart" type="time" value="${s.quietHours.start}"></div><div><label>To</label><input id="qhEnd" type="time" value="${s.quietHours.end}"></div></div>
-        ${chk("dsOn", "Daily summary on WhatsApp", s.dailySummary.enabled)}
-        <div class="grid2"><div><label>Send at</label><input id="dsTime" type="time" value="${s.dailySummary.time}"></div></div></div>
-      <div class="row"><button class="btn" onclick="saveSettings(this)">Save settings</button><span class="muted">Saving also updates Ada.</span></div>`;
+    const sw = (id, title, text, on, disabled) => `<div class="set-row"><div class="grow"><b>${title}</b>${text ? `<small>${text}</small>` : ""}</div><label class="switch"><input type="checkbox" id="${id}" ${on ? "checked" : ""} ${disabled ? "disabled" : ""}><span></span></label></div>`;
+    const modeSel = (k) => `<select id="al_${k}">${[["ring", "Ring until I tap"], ["notify", "Notify once"], ["digest", "Quietly in the app"]].map(([v, l]) => `<option value="${v}" ${s.alerts[k] === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+    const f = (id, label, v, ph = "") => `<label class="field"><span>${label}</span><input id="${id}" value="${esc(v)}" placeholder="${esc(ph)}"></label>`;
+    return pageHead("Settings", "", true) + `
+      <div class="group"><h2>Business</h2><div class="card form">
+        ${f("name", "Business name", b.name)}
+        <div class="grid-2">${f("category", "What you sell", b.category, "Food, fashion, phones…")}${f("location", "Location", b.location, "Surulere, Lagos")}</div>
+        <div class="grid-2">${f("openingHours", "Opening hours", b.openingHours, "Mon–Sat, 9am–8pm")}${f("ownerName", "Your name", b.ownerName)}</div>
+        <label class="field"><span>About the business</span><textarea id="description" placeholder="Home-cooked Nigerian meals, made fresh daily.">${esc(b.description)}</textarea></label>
+        <label class="field"><span>Delivery</span><textarea id="deliveryInfo" placeholder="Dispatch rider. Mainland ₦1,500, Island ₦2,500.">${esc(b.deliveryInfo)}</textarea></label>
+      </div></div>
+      <div class="group"><h2>${esc(s.agentName)}, your receptionist</h2><div class="card form">
+        <div class="grid-2">${f("agentName", "Name", s.agentName)}<label class="field"><span>Language</span><select id="languageStyle"><option value="pidgin" ${s.languageStyle === "pidgin" ? "selected" : ""}>English + Pidgin</option><option value="english" ${s.languageStyle === "english" ? "selected" : ""}>English only</option></select></label></div>
+        ${f("greeting", "Greeting", s.greeting, b.greetingPreview)}
+        <label class="field"><span>Rules ${esc(s.agentName)} must follow</span><textarea id="extraRules" placeholder="Never give discounts. Don't promise delivery before 11am.">${esc(s.extraRules)}</textarea></label>
+      </div></div>
+      <div class="group"><h2>Orders & payment</h2><div class="card flush list">
+        ${sw("takeOrders", "Take orders", "Ada reads the order back and adds up the total.", s.takeOrders)}
+        ${sw("paymentLinks", "Send payment links", b.payoutConnected ? "Customers get a Paystack link by SMS." : "Connect your bank in Plan & payments first.", s.paymentLinks)}
+        <div class="set-row" style="display:block"><label class="field"><span>Payment instructions (when links are off)</span><textarea id="paymentInstructions" placeholder="Pay to GTBank 0123456789, Mama Tee's Kitchen, and send proof on WhatsApp.">${esc(s.paymentInstructions)}</textarea></label></div>
+      </div></div>
+      <div class="group"><h2>When ${esc(s.agentName)} needs you</h2><div class="card flush list">
+        <div class="set-row"><div class="grow"><b>Callback promise</b><small>Ada tells customers you'll call back within…</small></div><div style="width:110px"><label class="field"><select id="callbackMinutes">${[5, 10, 15, 30, 60, 120].map((m) => `<option value="${m}" ${s.callbackMinutes === m ? "selected" : ""}>${m < 60 ? m + " min" : m / 60 + " hour" + (m > 60 ? "s" : "")}</option>`).join("")}${[5, 10, 15, 30, 60, 120].includes(s.callbackMinutes) ? "" : `<option value="${s.callbackMinutes}" selected>${s.callbackMinutes} min</option>`}</select></label></div></div>
+        <div class="set-row" style="display:grid;gap:12px"><b>How loud to alert you</b>
+          <div class="grid-2"><label class="field"><span>Urgent</span>${modeSel("urgent")}</label><label class="field"><span>Normal</span>${modeSel("normal")}</label></div>
+          <label class="field"><span>Low</span>${modeSel("low")}</label></div>
+        ${sw("aiCallsBack", `${esc(s.agentName)} calls customers back`, "With the answer you type or voice-note.", s.aiCallsBack)}
+        ${sw("apologySms", "Apology text if I'm late", "Polite SMS to the customer when the callback time passes.", s.apologySms)}
+        ${sw("whatsappAlerts", "WhatsApp alerts", features.whatsapp ? "" : "Coming soon.", s.whatsappAlerts)}
+        ${sw("smsAlerts", "SMS backup", "If WhatsApp fails, and always for urgent alerts.", s.smsAlerts)}
+      </div></div>
+      <div class="group"><h2>Quiet time</h2><div class="card flush list">
+        ${sw("qhOn", "Quiet hours", "Only urgent alerts come through.", s.quietHours.enabled)}
+        <div class="set-row"><div class="grid-2" style="width:100%"><label class="field"><span>From</span><input id="qhStart" type="time" value="${s.quietHours.start}"></label><label class="field"><span>To</span><input id="qhEnd" type="time" value="${s.quietHours.end}"></label></div></div>
+        ${sw("dsOn", "Daily summary", "Yesterday's calls, orders and sales.", s.dailySummary.enabled)}
+        <div class="set-row"><div class="grow"><b>Send at</b></div><div style="width:130px"><label class="field"><input id="dsTime" type="time" value="${s.dailySummary.time}"></label></div></div>
+      </div></div>
+      <button class="btn btn-primary btn-block" style="margin-top:24px" onclick="saveSettings(this)">Save changes</button>`;
   },
 };
 
+// ---- Sheets for adding things ----
+function addProductSheet() {
+  openSheet(`<div class="stack"><h2>Add item</h2>
+    <label class="field"><span>Name</span><input id="pName" placeholder="Jollof rice + chicken"></label>
+    <label class="field"><span>Price (₦)</span><input id="pPrice" type="number" inputmode="numeric" min="0" placeholder="3500"></label>
+    <label class="field"><span>Description (optional)</span><input id="pDesc" placeholder="Comes with plantain"></label>
+    <button class="btn btn-primary btn-block" onclick="addProduct(this)">Add to menu</button></div>`);
+  $("pName").focus();
+}
+function addFaqSheet() {
+  openSheet(`<div class="stack"><h2>Teach Ada an answer</h2>
+    <label class="field"><span>When a customer asks</span><input id="fQ" placeholder="Do you deliver to Lekki?"></label>
+    <label class="field"><span>Ada says</span><textarea id="fA" placeholder="Yes, delivery to Lekki is ₦2,500 and takes about an hour."></textarea></label>
+    <button class="btn btn-primary btn-block" onclick="addFaq(this)">Save answer</button></div>`);
+  $("fQ").focus();
+}
+function topUpSheet() {
+  const min = state.features.minTopUpNaira;
+  openSheet(`<div class="stack"><h2>Top up wallet</h2><p class="muted small">Extra minutes come from your wallet, like airtime.</p>
+    <div class="row" style="flex-wrap:wrap;gap:8px">${[2000, 5000, 10000, 20000].map((a) => `<button class="btn btn-sm btn-secondary" onclick="$('topup').value=${a}">${naira(a)}</button>`).join("")}</div>
+    <label class="field"><span>Amount (₦)</span><input id="topup" type="number" inputmode="numeric" min="${min}" step="500" placeholder="5000"></label>
+    <button class="btn btn-primary btn-block" onclick="topUp(this)">Pay with Paystack</button></div>`);
+}
+async function showCall(id) {
+  openSheet(`<p class="muted">Loading…</p>`);
+  const c = await api("/api/calls/" + encodeURIComponent(id));
+  openSheet(`<div class="stack"><h2>${esc(c.customer_phone || "Unknown number")}</h2><p class="small muted">${toDate(c.created_at).toLocaleString()} · ${Math.ceil(c.duration_secs / 60)} min</p>
+    ${c.summary ? `<div class="card"><p class="small muted">Summary</p><p>${esc(c.summary)}</p></div>` : ""}
+    <div class="transcript">${c.transcript.map((t) => `<p class="${t.role === "agent" ? "" : "me"}"><b>${t.role === "agent" ? esc(state.business.settings.agentName) : "Customer"}</b>${esc(t.message)}</p>`).join("") || `<p class="muted">No transcript.</p>`}</div>
+    ${c.customer_phone ? `<a class="btn btn-primary btn-block" href="tel:${esc(c.customer_phone)}">${icon("calls")} Call back</a>` : ""}</div>`);
+}
+
 // ---- Actions ----
-async function escUpdate(btn, id, status) {
-  const ownerAnswer = val("ans" + id).trim();
+async function escUpdate(btn, id, status, silent) {
+  const ownerAnswer = $("ans" + id)?.value.trim();
   if (status === "resolved" && !ownerAnswer) return toast("Type your answer first");
   const r = await busy(btn, () => api(`/api/escalations/${id}`, { method: "PATCH", body: { status, ownerAnswer: ownerAnswer || undefined, saveAsFaq: status === "resolved" && checked("save" + id), callBack: status === "resolved" && checked("cb" + id) } }));
-  const msg = { calling: "Ada is calling them now", no_number: "Saved. No number to call them back on", not_set_up: "Saved. Ada couldn't call: get your Pickam number first", failed: "Ada couldn't call, so your answer was sent by SMS" };
-  toast(msg[r.callback] || "Saved");
+  const ada = state.business.settings.agentName;
+  const msg = { calling: `${ada} is calling them now`, no_number: "Saved. There's no number to call back on.", not_set_up: "Saved. Connect your number so Ada can call back.", failed: "Couldn't call, so your answer was sent by SMS" };
+  if (!silent) toast(msg[r.callback] || "Saved");
   ackRing(); render();
 }
 async function orderStatus(id, status) { await api(`/api/orders/${id}`, { method: "PATCH", body: { status } }); render(); }
-async function addProduct() { await api("/api/products", { method: "POST", body: { name: val("pName"), priceNaira: Number(val("pPrice")), description: val("pDesc") } }); render(); }
+async function addProduct(btn) {
+  if (!val("pName").trim() || val("pPrice") === "") return toast("Add a name and price");
+  await busy(btn, () => api("/api/products", { method: "POST", body: { name: val("pName").trim(), priceNaira: Number(val("pPrice")), description: val("pDesc") } }));
+  closeSheet(); render();
+}
 async function toggleProduct(id, available) { await api(`/api/products/${id}`, { method: "PATCH", body: { available } }); render(); }
 async function delProduct(id) { if (confirm("Delete this item?")) { await api(`/api/products/${id}`, { method: "DELETE" }); render(); } }
-async function addFaq() { await api("/api/faqs", { method: "POST", body: { question: val("fQ"), answer: val("fA") } }); render(); }
-async function delFaq(id) { if (confirm("Delete this answer?")) { await api(`/api/faqs/${id}`, { method: "DELETE" }); render(); } }
-async function loadTranscript(el, id) {
-  const box = el.nextElementSibling; if (box.dataset.loaded) return; box.dataset.loaded = 1;
-  const c = await api("/api/calls/" + encodeURIComponent(id));
-  box.innerHTML = c.transcript.map((t) => `<p><b>${t.role === "agent" ? "Ada" : "Caller"}:</b> ${esc(t.message)}</p>`).join("");
+async function addFaq(btn) {
+  if (!val("fA").trim()) return toast("Write Ada's answer");
+  await busy(btn, () => api("/api/faqs", { method: "POST", body: { question: val("fQ"), answer: val("fA") } }));
+  closeSheet(); render();
 }
+async function delFaq(id) { if (confirm("Delete this answer?")) { await api(`/api/faqs/${id}`, { method: "DELETE" }); render(); } }
 async function getNumber(btn) { await busy(btn, () => api("/api/number/provision", { method: "POST" })); refresh(); }
 async function buyPlan(btn, plan) { const r = await busy(btn, () => api("/api/billing/checkout", { method: "POST", body: { plan } })); location.href = r.url; }
 async function topUp(btn) { const r = await busy(btn, () => api("/api/billing/checkout", { method: "POST", body: { walletAmountNaira: Number(val("topup")) } })); location.href = r.url; }
@@ -500,15 +805,15 @@ async function saveSettings(btn) {
   };
   await busy(btn, async () => {
     await api("/api/business", { method: "PUT", body: { profile, settings } });
-    try { await api("/api/agent/sync", { method: "POST", quiet: true }); toast("Saved and Ada updated"); } catch { toast("Saved. Ada could not be updated right now: check the ElevenLabs settings on the server."); }
+    try { await api("/api/agent/sync", { method: "POST", quiet: true }); toast("Saved. Ada is up to date."); } catch { toast("Saved. Ada will update shortly."); }
   });
-  await loadBusiness(); $("bizName").textContent = state.business.name;
+  await loadBusiness();
 }
 
-// Bank list loads lazily when the billing tab shows the payout form.
+// Bank list loads when the payout form appears.
 new MutationObserver(async () => {
   const sel = $("bank"); if (!sel || sel.dataset.loaded) return; sel.dataset.loaded = 1;
-  try { const banks = await api("/api/payouts/banks", { quiet: true }); sel.innerHTML = `<option value="">Choose bank</option>` + banks.map((b) => `<option value="${esc(b.code)}">${esc(b.name)}</option>`).join(""); }
+  try { const banks = await api("/api/payouts/banks", { quiet: true }); sel.innerHTML = `<option value="">Choose your bank</option>` + banks.map((b) => `<option value="${esc(b.code)}">${esc(b.name)}</option>`).join(""); }
   catch { sel.innerHTML = `<option value="">Couldn't load banks</option>`; }
 }).observe($("view"), { childList: true });
 
