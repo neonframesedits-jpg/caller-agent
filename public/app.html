@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pickam Dashboard</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#052e1b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pickam">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
 <style>
   :root { --bg:#f6f7f4; --card:#fff; --ink:#1b1f1a; --muted:#646b62; --line:#e2e5df; --brand:#0a7a3e; --brand-ink:#fff; --brand-soft:#e3f2e9; --urgent:#c62828; --warn:#b26a00; }
   @media (prefers-color-scheme: dark) { :root { --bg:#121512; --card:#1b1f1b; --ink:#e9ece7; --muted:#9aa297; --line:#2c312b; --brand:#2fb36a; --brand-ink:#08130c; --brand-soft:#16301f; --urgent:#ff6b6b; --warn:#f0a840; } }
@@ -41,6 +48,15 @@
   pre { white-space:pre-wrap; margin:0; font:inherit; }
   a { color:var(--brand); }
   #login, #wizard { max-width:520px; margin:48px auto; padding:0 16px; }
+  .opt { display:block; border:1.5px solid var(--line); border-radius:12px; padding:12px 12px 12px 40px; margin:8px 0; cursor:pointer; position:relative; background:var(--card); }
+  .opt.on { border-color:var(--brand); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+  .opt input { position:absolute; left:12px; top:15px; width:auto; margin:0; }
+  .opt span { display:block; color:var(--muted); font-size:13px; margin-top:2px; }
+  .dial { text-align:center; margin:14px 0 10px; }
+  .dial .code { font-size:clamp(16px, 6vw, 28px); letter-spacing:.5px; white-space:nowrap; }
+  a.btn { display:inline-block; text-decoration:none; text-align:center; font:inherit; border-radius:8px; padding:8px 14px; background:var(--brand); color:var(--brand-ink); }
+  .btn.wide { display:block; width:100%; padding:14px; font-size:17px; font-weight:600; }
+  ol.setup { margin:8px 0 0; padding-left:20px; } ol.setup li { margin:10px 0; }
   #toast { position:fixed; left:50%; bottom:20px; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:10px 16px; border-radius:10px; display:none; z-index:5; max-width:90vw; }
 </style>
 </head>
@@ -73,7 +89,7 @@
 </div>
 
 <script>
-const TABS = { inbox: "Callbacks", orders: "Orders", calls: "Calls", menu: "Menu", faqs: "Answers", billing: "Plan & number", settings: "Settings" };
+const TABS = { inbox: "Callbacks", orders: "Orders", calls: "Calls", menu: "Menu", faqs: "Answers", billing: "My number & plan", settings: "Settings" };
 const CATEGORIES = {
   food: { label: "Food & catering", questions: ["Do you deliver? How much is delivery?", "How long does delivery take?", "Do you cater for parties and events?", "What time do you stop taking orders?"] },
   fashion: { label: "Fashion & clothing", questions: ["What sizes do you have?", "Can I return or exchange an item?", "Do you deliver outside Lagos?", "Can I see the item before paying?"] },
@@ -149,6 +165,94 @@ function listen() {
   };
 }
 
+// ---- Installed app: service worker, install prompt, phone notifications ----
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+let installEvent = null;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvent = e; if (tab === "inbox" && state.business) render(); });
+addEventListener("appinstalled", () => { installEvent = null; toast("Pickam is on your home screen 🎉"); });
+
+async function installApp() {
+  if (!installEvent) return;
+  installEvent.prompt();
+  await installEvent.userChoice.catch(() => {});
+  installEvent = null; render();
+}
+const pushOn = () => pushSupported && Notification.permission === "granted" && lsGet("pickamPush") === "1";
+function b64ToBytes(b64) {
+  const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+async function enablePush(btn) {
+  await busy(btn, async () => {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return toast("Notifications are blocked. Allow them for Pickam in your phone settings.");
+    const reg = await navigator.serviceWorker.ready;
+    const { publicKey } = await api("/api/push/key");
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+    await api("/api/push/subscribe", { method: "POST", body: sub.toJSON() });
+    lsSet("pickamPush", "1");
+    toast("Alerts are on 🔔 You'll get orders and callbacks on this phone.");
+  });
+  render();
+}
+
+// "Connect your number": the call-forwarding code the owner dials once.
+const fwdKey = () => `pickamFwd:${state.business.id}:${state.business.settings.answerMode || "missed"}`;
+const fwdDone = () => lsGet(fwdKey()) === "1";
+function setFwdDone(on) { lsSet(fwdKey(), on ? "1" : null); render(); }
+const telHref = (code) => "tel:" + code.replace(/#/g, "%23");
+async function copyCode(code, btn) {
+  try { await navigator.clipboard.writeText(code); btn.textContent = "Copied ✓ Now open the Phone app"; } catch { prompt("Copy this code:", code); }
+}
+async function setAnswerMode(mode) {
+  await api("/api/business", { method: "PUT", body: { settings: { answerMode: mode } } });
+  await loadBusiness(); render();
+}
+function dialButton(code, label) {
+  const c = esc(code);
+  return isIOS
+    ? `<button class="btn wide" onclick="copyCode('${c}', this)">📋 Copy code</button>
+       <p class="muted">iPhone: tap <b>Copy code</b>, open the <b>Phone</b> app, tap the keypad, paste, then press call.</p>`
+    : `<a class="btn wide" href="${telHref(code)}">📞 ${label}</a>
+       <p class="muted">This opens your phone's dialer with the code filled in. Just press call.</p>`;
+}
+function forwardingCard() {
+  const f = state.forwarding, b = state.business;
+  if (!f) return `<div class="card"><b>Connect your number to Ada</b><p class="muted">First, get the line Ada answers on.</p><button class="btn" onclick="getNumber(this)">Get my Pickam line</button></div>`;
+  const mode = b.settings.answerMode || "missed", code = f[mode];
+  const opt = (m, title, text) => `<label class="opt ${mode === m ? "on" : ""}"><input type="radio" name="answerMode" ${mode === m ? "checked" : ""} onchange="setAnswerMode('${m}')"><b>${title}</b><span>${text}</span></label>`;
+  return `<div class="card soft"><b style="font-size:18px">Connect your number to ${esc(b.settings.agentName)}</b>
+    <p class="muted">Customers keep calling <b>your own number</b> (${esc(b.ownerPhone)}). Choose which calls ${esc(b.settings.agentName)} answers:</p>
+    ${opt("missed", "Only calls I miss (recommended)", "You pick when you can. When you don't answer, you're busy, or your phone is off, Ada picks.")}
+    ${opt("all", "Every call", "Your phone won't ring for calls. Ada answers every customer and sends you the order and address.")}
+    <div class="dial"><div class="muted">Dial this once on the phone with ${esc(b.ownerPhone)}</div><div class="code">${esc(code)}</div></div>
+    ${dialButton(code, "Turn on Ada")}
+    <p class="muted">Your phone will show "Call forwarding activated" or similar. <b>Test it:</b> ask a friend to call you${mode === "missed" ? " and don't pick" : ""}. Ada should answer.</p>
+    <label class="check"><input type="checkbox" ${fwdDone() ? "checked" : ""} onchange="setFwdDone(this.checked)">I've done it, and Ada answered my test call</label>
+    <p class="muted" style="margin-top:12px">To turn Ada off, dial <a class="code" href="${isIOS ? "#" : telHref(f.off)}">${f.off}</a>. Ada's line: ${esc(f.number)}. Your network may charge normal airtime for forwarded calls.</p></div>`;
+}
+function setupChecklist() {
+  if (!state.business) return "";
+  const steps = [];
+  if (!fwdDone()) steps.push(`<li><b>Connect your number</b> so Ada answers your customers.<br><button class="btn" style="margin-top:6px" onclick="tab='billing';render()">Set it up</button></li>`);
+  if (!isStandalone()) {
+    steps.push(installEvent
+      ? `<li><b>Install the Pickam app</b> on this phone.<br><button class="btn" style="margin-top:6px" onclick="installApp()">📲 Install app</button></li>`
+      : isIOS
+        ? `<li><b>Install the Pickam app:</b> tap the <b>Share</b> button ⬆️ at the bottom of Safari, then <b>Add to Home Screen</b>.</li>`
+        : `<li><b>Install the Pickam app:</b> open your browser menu <b>⋮</b> and tap <b>Install app</b> or <b>Add to Home screen</b>.</li>`);
+  }
+  if (pushSupported && !pushOn()) {
+    steps.push(isIOS && !isStandalone()
+      ? `<li><b>Turn on order alerts:</b> install the app first (step above), open it from your home screen, then turn on alerts.</li>`
+      : `<li><b>Turn on order alerts</b> so new orders and callbacks pop up on this phone.<br><button class="btn" style="margin-top:6px" onclick="enablePush(this)">🔔 Turn on alerts</button></li>`);
+  }
+  return steps.length ? `<div class="card"><b>Finish setting up</b><ol class="setup">${steps.join("")}</ol></div>` : "";
+}
+
 // ---- Startup ----
 async function loadBusiness() { state = await api("/api/business"); return state; }
 async function start() {
@@ -203,8 +307,8 @@ async function wizard(step) {
       <p class="row"><button class="btn" onclick="wizardSave2(this, ${cat.questions.length})">Next</button><button class="btn ghost" onclick="wizard(1)">Back</button></p></div>`;
   } else {
     w.innerHTML = `<div class="card">${head(3, "Get your Pickam number")}
-      <p>We'll give you a Nigerian number that Ada answers. You keep your own number: calls you miss get forwarded to Ada.</p>
-      <p><button class="btn" onclick="wizardFinish(this)">Get my number</button></p><div id="wNum"></div></div>`;
+      <p>Customers keep calling <b>your own number</b>. You'll dial one short code, and calls you can't pick go to Ada.</p>
+      <p><button class="btn" onclick="wizardFinish(this)">Connect my number</button></p><div id="wNum"></div></div>`;
   }
 }
 async function wizardSave1(btn) {
@@ -221,28 +325,23 @@ async function wizardSave2(btn, nq) {
 }
 async function wizardFinish(btn) {
   try {
-    const r = await busy(btn, () => api("/api/onboarding/complete", { method: "POST", quiet: true }));
-    $("wNum").innerHTML = numberCard(r.number, r.forwardingCodes) + `<p><button class="btn" onclick="start()">Go to my dashboard</button></p>`;
+    await busy(btn, () => api("/api/onboarding/complete", { method: "POST", quiet: true }));
+    await loadBusiness();
+    $("wNum").innerHTML = forwardingCard() + `<p><button class="btn" onclick="start()">Go to my dashboard</button></p>`;
   } catch (e) {
     $("wNum").innerHTML = `<p class="muted">${esc(e.message)}</p><p><button class="btn" onclick="start()">Go to my dashboard</button></p>`;
   }
   btn.hidden = true;
-}
-function numberCard(number, codes) {
-  return `<div class="card soft"><div class="muted">Your Pickam number</div><div class="big">${esc(number)}</div>
-    <p>To send calls you miss to Ada, dial one of these on your own phone:</p>
-    ${codes.map((c) => `<div class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(c.when)}</span><a class="code" href="tel:${encodeURIComponent(c.code)}">${esc(c.code)}</a></div>`).join("")}
-    <p class="muted">Test it: ask a friend to call you and don't pick. Ada should answer.</p></div>`;
 }
 
 // ---- Tabs ----
 const VIEWS = {
   async inbox() {
     const items = await api("/api/escalations");
-    if (!items.length) return `<div class="card muted">No callbacks yet. When Ada can't answer a customer, they show up here.</div>`;
+    if (!items.length) return setupChecklist() + `<div class="card muted">No callbacks yet. When Ada can't answer a customer, they show up here.</div>`;
     const s = state.business.settings, now = Date.now();
     const cbNote = { calling: "Ada is calling them with your answer", no_number: "No number to call back", not_set_up: "Ada couldn't call (number not set up)", failed: "Call failed, answer sent by SMS" };
-    return items.map((e) => {
+    return setupChecklist() + items.map((e) => {
       const overdue = e.status === "open" && new Date(e.callback_due_at).getTime() < now;
       return `<div class="card">
         <div class="row"><b>#${e.id}</b><span class="pill ${e.urgency}">${e.urgency}</span><span class="pill">${e.status}</span>${overdue ? `<span class="pill urgent">overdue</span>` : ""}
@@ -305,11 +404,10 @@ const VIEWS = {
   },
   async billing() {
     await loadBusiness();
-    const { business: b, usage: u, plans, forwardingCodes, features } = state;
+    const { business: b, usage: u, plans, features } = state;
     const pct = u.plan.includedMinutes ? Math.min(100, (100 * u.minutesUsed) / u.plan.includedMinutes) : 0;
     const ledger = await api("/api/billing/ledger");
-    const number = b.phoneNumber ? numberCard(b.phoneNumber, forwardingCodes)
-      : `<div class="card"><b>Your Pickam number</b><p class="muted">You don't have a number yet.</p><button class="btn" onclick="getNumber(this)">Get my number</button></div>`;
+    const number = forwardingCard();
     const payButtons = features.payments;
     return number + `
       <div class="card"><div class="row"><b style="flex:1">${esc(u.plan.name)}</b><span class="pill ${u.active ? "good" : "urgent"}">${u.active ? "active until " + new Date(u.expiresAt).toLocaleDateString() : "expired"}</span></div>
@@ -344,7 +442,7 @@ const VIEWS = {
         <div><label>Language</label><select id="languageStyle"><option value="pidgin" ${s.languageStyle === "pidgin" ? "selected" : ""}>English + Pidgin when caller uses it</option><option value="english" ${s.languageStyle === "english" ? "selected" : ""}>English only</option></select></div></div>
         ${f("greeting", "Greeting (leave empty for the default)", s.greeting, b.greetingPreview)}
         ${chk("takeOrders", "Let Ada take orders", s.takeOrders)}
-        ${chk("paymentLinks", `Text customers a payment link after they order${b.payoutConnected ? "" : " (connect your bank in Plan & number first)"}`, s.paymentLinks)}
+        ${chk("paymentLinks", `Text customers a payment link after they order${b.payoutConnected ? "" : " (connect your bank in My number & plan first)"}`, s.paymentLinks)}
         <label>Payment instructions (used when payment links are off)</label><textarea id="paymentInstructions" placeholder="Pay to GTBank 0123456789, Mama Tee's Kitchen, and send proof on WhatsApp.">${esc(s.paymentInstructions)}</textarea>
         <label>Rules Ada must follow</label><textarea id="extraRules" placeholder="Never give discounts. Don't promise delivery before 11am.">${esc(s.extraRules)}</textarea></div>
       <div class="card"><b>When Ada needs you</b>

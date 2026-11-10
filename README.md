@@ -34,7 +34,7 @@ Nigerian number (SIP trunk) ──► ElevenLabs Agent (voice + LLM)
 | Address | What it is |
 |---|---|
 | `/` | Landing page: animated call demo, missed-call calculator, pricing, FAQ, early-access form |
-| `/app` | Business owner dashboard: login, setup wizard, callbacks, orders, settings |
+| `/app` | Business owner app (installable on Android and iPhone, with phone notifications): login, setup wizard, connect-your-number codes, callbacks, orders, settings |
 | `/admin/waitlist?format=csv&key=ADMIN_KEY` | Download the waitlist as a spreadsheet, with source (`?ref=tiktok`) and referrals |
 
 While `SIGNUPS_OPEN=false`, the landing page collects a waitlist. Set it to `true` at launch and the buttons go straight to signup.

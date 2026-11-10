@@ -14,6 +14,8 @@ export interface Settings {
   greeting: string;
   /** "english" = clear Nigerian English; "pidgin" = switches to Pidgin when the caller does. */
   languageStyle: "english" | "pidgin";
+  /** Which calls the owner forwards to Ada: only missed/busy/unreachable ones, or every call. */
+  answerMode: "missed" | "all";
   /** Minutes the AI promises the owner will call back within. */
   callbackMinutes: number;
   /** How hard to alert the owner, per urgency level. */
@@ -44,6 +46,7 @@ export const defaultSettings = (): Settings => ({
   agentName: "Ada",
   greeting: "",
   languageStyle: "pidgin",
+  answerMode: "missed",
   callbackMinutes: 10,
   alerts: { low: "digest", normal: "notify", urgent: "ring" },
   whatsappAlerts: true,
@@ -231,6 +234,14 @@ export function openDb(path: string): DatabaseSync {
       number TEXT PRIMARY KEY,
       elevenlabs_phone_number_id TEXT,
       business_id TEXT UNIQUE REFERENCES businesses(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- Phones and browsers where the owner turned on Pickam notifications (Web Push).
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      endpoint TEXT PRIMARY KEY,
+      business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+      keys_json TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -798,3 +809,27 @@ export const countPayingBusinesses = () =>
   Number((getDb().prepare("SELECT COUNT(DISTINCT business_id) AS n FROM payments WHERE purpose = 'plan' AND status = 'success'").get() as Row).n);
 export const hasPaidForPlan = (businessId: string) =>
   !!getDb().prepare("SELECT 1 FROM payments WHERE business_id = ? AND purpose = 'plan' AND status = 'success'").get(businessId);
+
+// ---- Push notifications -------------------------------------------------------------------
+
+export interface PushSubscriptionRow {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export function savePushSubscription(businessId: string, sub: PushSubscriptionRow) {
+  getDb()
+    .prepare(
+      `INSERT INTO push_subscriptions (endpoint, business_id, keys_json) VALUES (?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET business_id = excluded.business_id, keys_json = excluded.keys_json`,
+    )
+    .run(sub.endpoint, businessId, JSON.stringify(sub.keys));
+}
+
+export const listPushSubscriptions = (businessId: string): PushSubscriptionRow[] =>
+  (getDb().prepare("SELECT endpoint, keys_json FROM push_subscriptions WHERE business_id = ?").all(businessId) as Row[]).map((r) => ({
+    endpoint: r.endpoint,
+    keys: JSON.parse(r.keys_json),
+  }));
+
+export const deletePushSubscription = (endpoint: string) => getDb().prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").run(endpoint);

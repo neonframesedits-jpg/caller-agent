@@ -16,6 +16,20 @@ export function normalizePhone(input: string): string | null {
 /** WhatsApp Cloud API uses numbers without the "+". */
 export const toWhatsAppId = (e164: string) => e164.replace(/^\+/, "");
 
+/**
+ * The codes the owner dials once to send calls to Ada (standard GSM codes, all Nigerian networks).
+ * "missed" = when unanswered, busy/rejected or unreachable; "all" = every call; "off" cancels all forwarding.
+ */
+export function forwardingSetup(pickamNumber: string) {
+  const n = pickamNumber.replace(/^\+234/, "0");
+  return {
+    number: n,
+    missed: `**004*${n}#`,
+    all: `**21*${n}#`,
+    off: "##002#",
+  };
+}
+
 /** GSM conditional call forwarding codes (work on MTN, Airtel, Glo and 9mobile). */
 export function forwardingCodes(pickamNumber: string) {
   // Networks accept the local 0XXXXXXXXXX format more reliably than +234 in forwarding codes.

@@ -255,6 +255,27 @@ test("9. daily summary goes out once, after the chosen time", async () => {
   assert.match(JSON.stringify(sent[0].body), /callbacks? pending/);
 });
 
+test("installed app: push key is stable, devices can subscribe, forwarding codes match the answer mode", async () => {
+  const k1 = (await owner.req("/api/push/key")).body.publicKey;
+  const k2 = (await owner.req("/api/push/key")).body.publicKey;
+  assert.ok(k1.length > 40);
+  assert.equal(k1, k2, "keys are generated once and reused");
+
+  const sub = { endpoint: "https://fcm.googleapis.com/fcm/send/abc123", expirationTime: null, keys: { p256dh: "BNcR".padEnd(87, "x"), auth: "tBHI".padEnd(22, "x") } };
+  assert.equal((await owner.req("/api/push/subscribe", "POST", sub)).status, 201);
+  assert.equal(db.listPushSubscriptions(biz.id).length, 1);
+  assert.equal((await owner.req("/api/push/subscribe", "POST", { endpoint: "not a url", keys: {} })).status, 400);
+  await owner.req("/api/push/unsubscribe", "POST", { endpoint: sub.endpoint });
+  assert.equal(db.listPushSubscriptions(biz.id).length, 0);
+
+  const me = (await owner.req("/api/business")).body;
+  assert.deepEqual(me.forwarding, { number: "02017001111", missed: "**004*02017001111#", all: "**21*02017001111#", off: "##002#" });
+  assert.equal(me.business.settings.answerMode, "missed");
+  await owner.req("/api/business", "PUT", { settings: { answerMode: "all" } });
+  assert.equal((await owner.req("/api/business")).body.business.settings.answerMode, "all");
+  assert.equal((await owner.req("/api/business", "PUT", { settings: { answerMode: "sometimes" } })).status, 400);
+});
+
 test("logout ends the session", async () => {
   assert.equal((await owner.req("/api/logout", "POST")).status, 204);
   assert.equal((await owner.req("/api/business")).status, 401);

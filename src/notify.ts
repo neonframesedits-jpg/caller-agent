@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { config } from "./config.js";
 import { linkWhatsAppMessage, type AlertMode, type Business, type Urgency } from "./db.js";
+import { pushToOwner } from "./push.js";
 import { sendAlertTemplate, whatsappConfigured } from "./whatsapp.js";
 
 export interface OwnerAlert {
@@ -96,6 +97,13 @@ export async function alertOwner(
   const full: OwnerAlert = { ...alert, mode, at: new Date().toISOString() };
   alertBus.emit(`business:${business.id}`, full);
   if (mode !== "digest") {
+    // Phone notification from the installed Pickam app; WhatsApp/SMS below are the backup.
+    void pushToOwner(business.id, {
+      title: mode === "ring" ? `🔔 ${full.title}` : full.title,
+      body: full.body,
+      tag: alert.refId !== undefined ? `${alert.kind}-${alert.refId}` : undefined,
+      urgent: mode === "ring",
+    }).catch((err) => console.error("[notify] push failed", err));
     const title = mode === "ring" ? `URGENT - ${full.title}` : full.title;
     const waId = await messageOwner(business, title, full.body, mode === "ring");
     if (waId && opts.escalationId) linkWhatsAppMessage(waId, business.id, opts.escalationId);

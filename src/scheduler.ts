@@ -3,6 +3,7 @@
 import * as db from "./db.js";
 import { formatNaira } from "./knowledge.js";
 import { alertOwner, messageOwner, sendSms } from "./notify.js";
+import { pushToOwner } from "./push.js";
 
 /** Remind the owner (loudly) about callbacks past their promised time, and apologise to the customer. */
 export async function chaseOverdueCallbacks(now = new Date()) {
@@ -62,7 +63,10 @@ export async function sendDailySummaries(now = new Date()) {
     if (minutes < h * 60 + (m || 0)) continue;
     db.setBusinessFields(b.id, { last_digest_date: date });
     const text = buildDailySummary(b, now);
-    if (text) await messageOwner(b, `Daily summary for ${b.name}`, text);
+    if (text) {
+      await pushToOwner(b.id, { title: `☀️ Daily summary · ${b.name}`, body: text, tag: "daily-summary" }).catch(() => 0);
+      await messageOwner(b, `Daily summary for ${b.name}`, text);
+    }
   }
 }
 

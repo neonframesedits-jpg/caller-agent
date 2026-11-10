@@ -93,6 +93,31 @@ Keep that link private, because it contains your admin key.
 - Reply to comments with a video. "Does it work for my salon?" makes a great reply video.
 - After someone joins, the page asks them to share their invite link on WhatsApp. That spreads in vendor groups.
 
+## How business owners connect their own number
+
+Owners never change their number. In the Pickam app (**My number & plan**), they choose:
+- **Only calls I miss:** dial `**004*<Ada's line>#`. Ada answers when they don't pick, are busy, or their phone is off.
+- **Every call:** dial `**21*<Ada's line>#`. Their phone doesn't ring, and Ada answers everyone.
+- **Turn off:** dial `##002#`.
+
+On Android, the **Turn on Ada** button opens the dialer with the code filled in, so they just press call. iPhones don't allow that from websites, so there's a **Copy code** button to paste into the Phone app's keypad. These are standard codes that work on MTN, Airtel, Glo and 9mobile. Owners pay normal airtime for forwarded calls. Confirm current rates with each network and tell owners upfront.
+
+**Testing today, before you have Nigerian numbers:**
+1. Buy a Twilio number (US/UK, a few dollars).
+2. In ElevenLabs → **Phone Numbers**, import it with the **Twilio** option.
+3. Assign it to your agent, then call it.
+
+You'll hear Ada on a real phone call. Forwarding your Nigerian line to it works too, but costs international airtime, so use it for testing and filming only.
+
+## The Pickam app (installable, with notifications)
+
+`/app` installs like a real app, with no Play Store needed. Owners see a **Finish setting up** checklist:
+1. connect their number
+2. install the app (Android: **Install app** button; iPhone: **Share → Add to Home Screen**)
+3. turn on **order alerts**
+
+After that, new orders, addresses, urgent callbacks and the daily summary pop up as phone notifications, even with the app closed. iPhones need iOS 16.4 or later, with Pickam opened from the home screen. Nothing to configure: the notification keys are generated automatically on first start.
+
 ## Step 6: When you're ready to launch for real
 
 1. Add your keys on Railway, following `.env.example`:

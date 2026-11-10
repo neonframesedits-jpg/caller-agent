@@ -38,6 +38,8 @@ export const config = {
     dailyCallLimit: Number(env("DEMO_DAILY_CALL_LIMIT", "50")),
     callsPerVisitorPerHour: Number(env("DEMO_CALLS_PER_VISITOR_PER_HOUR", "3")),
   },
+  /** Web Push keys. Leave empty: Pickam generates and stores a pair on first start. */
+  vapid: { publicKey: env("VAPID_PUBLIC_KEY"), privateKey: env("VAPID_PRIVATE_KEY") },
   /** First N businesses to buy a plan get their first month at half price. 0 turns the offer off. */
   foundingSlots: Number(env("FOUNDING_SLOTS", "100")),
   /** SIP trunk of the Nigerian voice provider, used when importing numbers into ElevenLabs. */

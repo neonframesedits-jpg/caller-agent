@@ -10,7 +10,8 @@ import { answerEscalation } from "../escalations.js";
 import { alertBus, type OwnerAlert } from "../notify.js";
 import { NoNumbersError, addNumberToPool, provisionNumber } from "../numbers.js";
 import * as paystack from "../paystack.js";
-import { forwardingCodes, normalizePhone } from "../phone.js";
+import { forwardingCodes, forwardingSetup, normalizePhone } from "../phone.js";
+import { vapidKeys } from "../push.js";
 import { FOUNDING_DISCOUNT_PERCENT, PLANS, usageFor } from "../plans.js";
 import { whatsappConfigured } from "../whatsapp.js";
 
@@ -106,6 +107,7 @@ apiRouter.get("/api/business", (req: OwnerRequest, res) => {
     usage: usageFor(b),
     plans: Object.values(PLANS).filter((p) => p.purchasable),
     forwardingCodes: b.phoneNumber ? forwardingCodes(b.phoneNumber) : [],
+    forwarding: b.phoneNumber ? forwardingSetup(b.phoneNumber) : null,
     features: {
       payments: paystack.paystackConfigured(),
       whatsapp: whatsappConfigured(),
@@ -134,6 +136,7 @@ const settingsSchema = z
     agentName: z.string().min(1),
     greeting: z.string(),
     languageStyle: z.enum(["english", "pidgin"]),
+    answerMode: z.enum(["missed", "all"]),
     callbackMinutes: z.number().int().min(1).max(24 * 60),
     alerts: z.object({ low: alertMode, normal: alertMode, urgent: alertMode }),
     whatsappAlerts: z.boolean(),
@@ -305,6 +308,27 @@ apiRouter.get("/api/calls/:conversationId", (req: OwnerRequest, res) => {
   const call = db.getCall(req.business!.id, String(req.params.conversationId));
   if (call) res.json(call);
   else fail(res, 404, "not found");
+});
+
+// ---- Phone notifications (installed app) ---------------------------------------------------
+
+apiRouter.get("/api/push/key", (_req, res) => res.json({ publicKey: vapidKeys().publicKey }));
+
+const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(1000),
+  keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
+});
+
+apiRouter.post("/api/push/subscribe", (req: OwnerRequest, res) => {
+  const sub = pushSubscriptionSchema.parse(req.body);
+  db.savePushSubscription(req.business!.id, sub);
+  res.status(201).json({ ok: true });
+});
+
+apiRouter.post("/api/push/unsubscribe", (req: OwnerRequest, res) => {
+  const { endpoint } = z.object({ endpoint: z.string() }).parse(req.body);
+  db.deletePushSubscription(endpoint);
+  res.status(204).end();
 });
 
 // ---- Live alerts (Server-Sent Events) -------------------------------------------------------
