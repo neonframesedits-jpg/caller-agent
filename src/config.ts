@@ -42,6 +42,11 @@ export const config = {
   vapid: { publicKey: env("VAPID_PUBLIC_KEY"), privateKey: env("VAPID_PRIVATE_KEY") },
   /** First N businesses to buy a plan get their first month at half price. 0 turns the offer off. */
   foundingSlots: Number(env("FOUNDING_SLOTS", "100")),
+  /** Twilio account. When set, Ada's lines in POOL_NUMBERS are Twilio numbers (e.g. a free-trial number). */
+  twilio: {
+    accountSid: env("TWILIO_ACCOUNT_SID"),
+    authToken: env("TWILIO_AUTH_TOKEN"),
+  },
   /** SIP trunk of the Nigerian voice provider, used when importing numbers into ElevenLabs. */
   sip: {
     address: env("SIP_TRUNK_ADDRESS"),

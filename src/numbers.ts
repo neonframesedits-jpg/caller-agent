@@ -1,7 +1,7 @@
 // Pool of Nigerian phone numbers Pickam owns, handed out to businesses during onboarding.
 import { config } from "./config.js";
 import * as db from "./db.js";
-import { assignNumberToAgent, importSipNumber, syncAgent } from "./elevenlabs.js";
+import { assignNumberToAgent, importPhoneNumber, syncAgent } from "./elevenlabs.js";
 import { alertAdmin } from "./notify.js";
 import { forwardingCodes, normalizePhone } from "./phone.js";
 
@@ -9,7 +9,7 @@ import { forwardingCodes, normalizePhone } from "./phone.js";
 export async function addNumberToPool(raw: string) {
   const number = normalizePhone(raw);
   if (!number) throw new Error("Invalid phone number");
-  const elevenlabsId = config.elevenlabs.apiKey ? await importSipNumber(number) : null;
+  const elevenlabsId = config.elevenlabs.apiKey ? await importPhoneNumber(number) : null;
   db.addPoolNumber(number, elevenlabsId);
   return { number, elevenlabsId };
 }
@@ -62,7 +62,7 @@ export async function syncPoolNumbersFromConfig(): Promise<string[]> {
       await addNumberToPool(number);
       added.push(number);
     } else if (!row.elevenlabs_phone_number_id && config.elevenlabs.apiKey) {
-      db.setPoolNumberElevenLabsId(number, await importSipNumber(number));
+      db.setPoolNumberElevenLabsId(number, await importPhoneNumber(number));
       added.push(number);
     }
   }

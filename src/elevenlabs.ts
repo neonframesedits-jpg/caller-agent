@@ -185,14 +185,23 @@ export function verifyWebhookSignature(rawBody: string, header: string | undefin
   return given.length === expected.length && timingSafeEqual(given, Buffer.from(expected));
 }
 
-/** Import a Nigerian SIP number into ElevenLabs. Returns its ElevenLabs phone_number_id. */
-export async function importSipNumber(number: string): Promise<string> {
-  const { address, username, password } = config.sip;
-  const trunk = { address, transport: "auto", ...(username ? { credentials: { username, password } } : {}) };
-  const created = await api("/convai/phone-numbers", {
-    method: "POST",
-    body: JSON.stringify({ phone_number: number, label: `Pickam ${number}`, provider: "sip_trunk", inbound_trunk_config: {}, outbound_trunk_config: trunk }),
-  });
+const usesTwilio = () => !!(config.twilio.accountSid && config.twilio.authToken);
+
+/**
+ * Import one of Ada's lines into ElevenLabs: a Twilio number when Twilio is configured, otherwise a SIP-trunk number.
+ * Returns its ElevenLabs phone_number_id.
+ */
+export async function importPhoneNumber(number: string): Promise<string> {
+  const label = `Pickam ${number}`;
+  let body: Record<string, unknown>;
+  if (usesTwilio()) {
+    body = { phone_number: number, label, provider: "twilio", sid: config.twilio.accountSid, token: config.twilio.authToken };
+  } else {
+    const { address, username, password } = config.sip;
+    const trunk = { address, transport: "auto", ...(username ? { credentials: { username, password } } : {}) };
+    body = { phone_number: number, label, provider: "sip_trunk", inbound_trunk_config: {}, outbound_trunk_config: trunk };
+  }
+  const created = await api("/convai/phone-numbers", { method: "POST", body: JSON.stringify(body) });
   return created.phone_number_id as string;
 }
 
@@ -208,7 +217,7 @@ export async function startOutboundCall(input: {
   firstMessage: string;
   variables: Record<string, string>;
 }): Promise<string | null> {
-  const res = await api("/convai/sip-trunk/outbound-call", {
+  const res = await api(usesTwilio() ? "/convai/twilio/outbound-call" : "/convai/sip-trunk/outbound-call", {
     method: "POST",
     body: JSON.stringify({
       agent_id: input.agentId,

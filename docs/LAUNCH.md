@@ -120,6 +120,22 @@ Ada answers calls over the internet, so her line must be a **virtual (SIP/VoIP) 
 4. Ask the provider to send incoming calls for that number to ElevenLabs. In ElevenLabs → **Phone Numbers**, open the number to see the SIP address to give them.
 5. Sign up in `/app` with your own business number. Setup assigns Ada's line and shows your forwarding code. Dial it, ask a friend to call you, and don't pick. Ada answers. 🎉
 
+### Free option for testing: a Twilio trial number
+
+1. Sign up at **twilio.com** (no card needed). You get about $15 of free credit and one free number. It's a US number, since Nigerian numbers aren't sold on the trial.
+2. In the Twilio Console, copy your **Account SID** and **Auth Token**.
+3. Under **Phone Numbers → Verified Caller IDs**, add every phone you'll test from (yours and a friend's). On the trial, only verified numbers can call in.
+4. On Railway, add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `POOL_NUMBERS` = your Twilio number (e.g. `+15551234567`). Pickam connects it to ElevenLabs by itself.
+5. Call it from a verified phone. You'll hear a short Twilio "trial account" message first, then Ada.
+
+**Trial limits:**
+- calls last 10 minutes at most
+- at most 4 calls at the same time
+- callers hear the trial message first
+- forwarding a Nigerian SIM to a US number costs international airtime
+
+So use it for testing and filming TikToks, and move to a Nigerian number for real customers.
+
 ## How business owners connect their own number
 
 Owners never change their number. In the Pickam app (**My number & plan**), they choose:

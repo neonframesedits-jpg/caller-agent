@@ -117,3 +117,22 @@ test("old databases get the new owner_email column on start-up", () => {
   assert.equal(db.getBusiness("b1")!.ownerEmail, "");
   db.openDb(":memory:");
 });
+
+test("with Twilio configured, Ada's lines are imported as Twilio numbers and callbacks go through Twilio", async () => {
+  const { syncPoolNumbersFromConfig } = await import("../src/numbers.js");
+  const { startOutboundCall } = await import("../src/elevenlabs.js");
+  config.twilio = { accountSid: "AC123", authToken: "tw-token" };
+  try {
+    config.poolNumbers = ["+15551234567"];
+    assert.deepEqual(await syncPoolNumbersFromConfig(), ["+15551234567"]);
+    const imported = callsTo(/convai\/phone-numbers$/).at(-1)!.body;
+    assert.deepEqual(
+      { provider: imported.provider, sid: imported.sid, token: imported.token, phone_number: imported.phone_number },
+      { provider: "twilio", sid: "AC123", token: "tw-token", phone_number: "+15551234567" },
+    );
+    await startOutboundCall({ agentId: "a", phoneNumberId: "p", to: "+2348011112222", firstMessage: "Hi", variables: {} });
+    assert.equal(callsTo(/outbound-call/).at(-1)!.url, "https://api.elevenlabs.io/v1/convai/twilio/outbound-call");
+  } finally {
+    config.twilio = { accountSid: "", authToken: "" };
+  }
+});
