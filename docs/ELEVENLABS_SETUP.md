@@ -61,6 +61,9 @@ No technical knowledge needed. You'll get two things:
 3. Add `ELEVENLABS_API_KEY` with your key as the value.
 4. Add `ELEVENLABS_DEFAULT_VOICE_ID` with your voice ID as the value.
 5. Railway restarts the site by itself.
+6. Leave out `ELEVENLABS_LLM`. Pickam then uses ElevenLabs' default AI model. Only set it if you've picked a specific model name from ElevenLabs' list, like `gpt-4o-mini`. It's **not** the voice ID.
+
+Once the key is in, Pickam automatically creates a **"Pickam website demo - Mama Tee's Kitchen"** agent in your ElevenLabs account. That's the agent behind the **"Talk to Ada now"** button on your website. You'll see it under **Agents** in ElevenLabs. Don't delete it. If you do, it's recreated when the site restarts.
 
 **On your computer** (if you run Pickam locally): open the `.env` file and fill in the same two lines:
 ```

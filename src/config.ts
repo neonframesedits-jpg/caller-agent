@@ -25,9 +25,21 @@ export const config = {
   elevenlabs: {
     apiKey: env("ELEVENLABS_API_KEY"),
     defaultVoiceId: env("ELEVENLABS_DEFAULT_VOICE_ID"),
-    llm: env("ELEVENLABS_LLM", "gpt-4o-mini"),
+    /** Leave empty to use ElevenLabs' default model. */
+    llm: env("ELEVENLABS_LLM"),
     webhookSecret: env("ELEVENLABS_WEBHOOK_SECRET"),
   },
+  /** The website "Talk to Ada" demo. Each call costs ElevenLabs minutes, so it is capped. */
+  demo: {
+    enabled: env("DEMO_ENABLED", "true") === "true",
+    /** Use an agent you made yourself in ElevenLabs instead of the one Pickam creates. */
+    agentId: env("DEMO_AGENT_ID"),
+    maxCallSeconds: Number(env("DEMO_MAX_CALL_SECONDS", "120")),
+    dailyCallLimit: Number(env("DEMO_DAILY_CALL_LIMIT", "50")),
+    callsPerVisitorPerHour: Number(env("DEMO_CALLS_PER_VISITOR_PER_HOUR", "3")),
+  },
+  /** First N businesses to buy a plan get their first month at half price. 0 turns the offer off. */
+  foundingSlots: Number(env("FOUNDING_SLOTS", "100")),
   /** SIP trunk of the Nigerian voice provider, used when importing numbers into ElevenLabs. */
   sip: {
     address: env("SIP_TRUNK_ADDRESS"),

@@ -1,5 +1,25 @@
 # Put the Pickam website online today (for TikTok)
 
+## Go-live checklist (the short version)
+
+1. ✅ Site on Railway, with a volume at `/data` and the variables from Step 2. *(You've done this.)*
+2. **Upgrade ElevenLabs to a paid plan** (Starter is about $5/month). The free plan's ~15 minutes would run out after a handful of TikTok viewers, and it doesn't allow business use.
+3. On Railway, add `ELEVENLABS_API_KEY` and `ELEVENLABS_DEFAULT_VOICE_ID`, and **delete `ELEVENLABS_LLM`**. Railway restarts the site, and Pickam creates the demo agent by itself.
+4. Open your site **in Chrome or Safari** (not inside TikTok). You should see a lime **"Talk to Ada now"** button. Tap it and order some jollof. 🎉
+   - No button? Check the Railway **Deploy Logs** for "Website demo agent ready" or an error line starting with `[demo]`.
+5. Set your budget: `DEMO_DAILY_CALL_LIMIT=50` (the default) costs at most about ₦13,000 a day. Raise it when a video takes off.
+6. Post the TikTok with `https://YOUR-ADDRESS/?ref=tiktok` in your bio. In the video, say: **"Open the link in your browser and talk to Ada yourself."**
+
+What viewers can do today:
+- **Talk to Ada** live in their browser. She's the receptionist for a demo jollof kitchen.
+- **Join the waitlist**, with the Founding 100 half-price first month.
+
+Businesses get their own Ada phone line once the phone numbers, SMS and WhatsApp approvals are in place (Step 6 below).
+
+> **TikTok tip:** TikTok's built-in browser often blocks the microphone. The page detects this and tells viewers to tap ⋯ → **Open in browser**. Say the same in your video and pinned comment.
+
+---
+
 This gets the **landing page and waitlist** live. You don't need ElevenLabs, Paystack or WhatsApp keys for this part: people can see Ada in action and join the list. Turn the rest on later.
 
 Time: about 20 minutes. Cost: Railway's Hobby plan, about **$5/month**.

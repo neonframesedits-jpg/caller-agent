@@ -23,6 +23,7 @@
     --display: "Bricolage Grotesque", system-ui, sans-serif; --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
   body { margin: 0; font: 16px/1.55 var(--body); color: var(--ink); background: var(--cream); overflow-x: hidden; }
   img, svg { display: block; max-width: 100%; }
@@ -209,6 +210,44 @@
   .faces { display: flex; } .faces span { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--night); margin-left: -10px; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--night); }
   .faces span:first-child { margin-left: 0; }
 
+  /* Live "Talk to Ada" call sheet */
+  .btn-lime { background: var(--lime); color: var(--night); box-shadow: 0 10px 30px -10px rgba(198,243,109,.6); }
+  .btn-lime:hover { background: #d4f78c; }
+  .live-dot { width: 10px; height: 10px; border-radius: 50%; background: #e53935; box-shadow: 0 0 0 0 rgba(229,57,53,.6); animation: livepulse 1.6s infinite; }
+  @keyframes livepulse { 70% { box-shadow: 0 0 0 10px rgba(229,57,53,0); } 100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); } }
+  .sheet { position: fixed; inset: 0; z-index: 50; display: none; align-items: flex-end; justify-content: center; background: rgba(3,20,12,.6); backdrop-filter: blur(4px); }
+  .sheet.open { display: flex; }
+  .sheet-card { width: min(480px, 100%); max-height: 100dvh; overflow-y: auto; background: var(--night); color: #fff; border-radius: 28px 28px 0 0; padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+    animation: sheetup .35s cubic-bezier(.2,.9,.3,1.1); }
+  @media (min-width: 640px) { .sheet { align-items: center; } .sheet-card { border-radius: 28px; } }
+  @keyframes sheetup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sheet-top { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+  .sheet-top .x { margin-left: auto; background: rgba(255,255,255,.1); border: 0; color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; }
+  .orb-wrap { display: grid; place-items: center; padding: 26px 0 10px; }
+  .orb { width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; font: 800 54px var(--display); color: var(--night);
+    background: radial-gradient(circle at 35% 30%, #e4fbb0, var(--lime) 45%, #7fc63a 100%); transition: transform .15s ease; box-shadow: 0 0 0 0 rgba(198,243,109,.35); }
+  .orb.speaking { animation: talk 1.1s ease-in-out infinite; }
+  .orb.listening { box-shadow: 0 0 0 14px rgba(198,243,109,.12), 0 0 0 28px rgba(198,243,109,.06); }
+  .orb.idle { filter: grayscale(.6) brightness(.8); }
+  @keyframes talk { 0%,100% { transform: scale(1); box-shadow: 0 0 0 10px rgba(198,243,109,.15); } 50% { transform: scale(1.06); box-shadow: 0 0 0 24px rgba(198,243,109,.08); } }
+  .call-status { text-align: center; font: 700 20px var(--display); margin-top: 16px; }
+  .call-sub { text-align: center; color: rgba(255,255,255,.65); font-size: 14px; min-height: 20px; }
+  .tries { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 16px 0 6px; }
+  .tries span { font-size: 13px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); }
+  .transcript { margin-top: 14px; display: grid; gap: 6px; max-height: 150px; overflow-y: auto; }
+  .transcript p { margin: 0; font-size: 14px; padding: 8px 12px; border-radius: 14px; background: rgba(255,255,255,.06); }
+  .transcript p.me { background: rgba(10,122,62,.6); justify-self: end; }
+  .transcript b { color: var(--lime); font-size: 12px; display: block; }
+  .sheet-card details { background: rgba(255,255,255,.06); border: 0; margin-top: 14px; color: #fff; }
+  .sheet-card summary { font-size: 15px; padding: 14px 0; }
+  .sheet-card summary::after { color: var(--lime); }
+  .sheet-card details ul { margin: 0 0 14px; padding-left: 18px; color: rgba(255,255,255,.8); font-size: 14px; }
+  .sheet-actions { display: grid; gap: 10px; margin-top: 18px; }
+  .btn-end { background: #e53935; color: #fff; }
+  .warn { background: rgba(242,97,29,.15); border: 1px solid rgba(242,97,29,.5); color: #ffd9c6; border-radius: 16px; padding: 14px; font-size: 14px; margin-top: 16px; }
+  .consent { text-align: center; font-size: 12px; color: rgba(255,255,255,.45); margin-top: 12px; }
+  .founding { display: inline-block; text-align: center; background: #fff1e8; color: var(--jollof-dark); border: 1px solid #fbd0b8; padding: 10px 18px; border-radius: 18px; font-weight: 600; margin-top: 18px; }
+
   footer { background: #031d11; color: rgba(255,255,255,.6); padding: 40px 0 120px; font-size: 14px; }
   footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; justify-content: space-between; align-items: center; }
   footer a { color: rgba(255,255,255,.8); }
@@ -245,9 +284,11 @@
       <h1>Your customers call.<br><em>Ada picks am.</em></h1>
       <p class="lead">Pickam is the AI receptionist that answers your business line in a warm, natural voice. She answers questions, takes orders, sends payment links, and only pings you when she really needs you.</p>
       <div class="cta-row">
+        <button class="btn btn-lime js-talk" type="button" hidden><span class="live-dot"></span> Talk to Ada now</button>
         <a class="btn btn-primary js-cta" href="#join">Get early access. It's free</a>
-        <a class="btn btn-ghost" href="#demo">▶ Watch Ada answer a call</a>
+        <a class="btn btn-ghost js-watch" href="#demo">▶ Watch Ada answer a call</a>
       </div>
+      <p class="js-talk-note" hidden style="margin:14px 0 0;color:rgba(255,255,255,.65);font-size:14px">🎙️ Real voice call in your browser. Try ordering jollof in Pidgin.</p>
       <div class="trust"><span>Keep your own number</span><span>English &amp; Pidgin</span><span>MTN, Airtel, Glo, 9mobile</span></div>
     </div>
     <div class="phone" aria-hidden="true"><div class="screen" id="heroPhone"></div></div>
@@ -273,7 +314,10 @@
         <button class="tab" role="tab" aria-selected="false" data-demo="phones">📱 Phone shop</button>
       </div>
       <ul class="demo-notes" id="demoNotes"></ul>
-      <button class="btn btn-dark listen" id="listen" type="button">🔊 Hear Ada's real voice</button>
+      <div class="cta-row" style="margin-top:22px">
+        <button class="btn btn-primary js-talk" type="button" hidden><span class="live-dot" style="background:#fff"></span> Call Ada yourself</button>
+        <button class="btn btn-dark listen" id="listen" type="button">🔊 Hear Ada's real voice</button>
+      </div>
     </div>
     <div class="phone reveal" aria-live="polite"><div class="screen" id="demoPhone"></div></div>
   </div>
@@ -337,13 +381,14 @@
   <div class="wrap center">
     <span class="eyebrow">Pricing</span>
     <h2 style="margin-top:10px">Cheaper than one missed order a week.</h2>
+    <div class="founding"><span>🔥 Founding 100: your first month is <b>half price</b></span></div>
     <div class="plans" style="text-align:left">
       <div class="plan reveal"><h3>Pay-as-you-go</h3><p class="for">For seasonal and occasional sellers</p><div class="price">₦5,000<small>/month</small></div><ul><li>Your Pickam number</li><li>₦350 per minute from your wallet</li><li>Top up like airtime</li></ul></div>
-      <div class="plan reveal"><h3>Starter</h3><p class="for">Home kitchens and Instagram vendors</p><div class="price">₦20,000<small>/month</small></div><ul><li>60 minutes (~30 calls)</li><li>Orders &amp; payment links</li><li>WhatsApp alerts</li></ul></div>
-      <div class="plan popular reveal"><span class="tag">Most popular</span><h3>Business</h3><p class="for">Shops, salons, pharmacies, restaurants</p><div class="price">₦45,000<small>/month</small></div><ul><li>200 minutes (~100 calls)</li><li>Everything in Starter</li><li>Ada calls customers back</li></ul></div>
-      <div class="plan reveal"><h3>Pro</h3><p class="for">Busy restaurants, clinics, schools</p><div class="price">₦110,000<small>/month</small></div><ul><li>600 minutes (~300 calls)</li><li>Everything in Business</li><li>Priority support</li></ul></div>
+      <div class="plan reveal"><h3>Starter</h3><p class="for">Home kitchens and Instagram vendors</p><div class="price">₦20,000<small>/month</small></div><p class="for" style="min-height:0;margin:6px 0 0">Just ₦667 a day</p><ul><li>60 minutes (~30 calls)</li><li>Orders &amp; payment links</li><li>WhatsApp alerts</li><li>Extra minutes ₦300</li></ul></div>
+      <div class="plan popular reveal"><span class="tag">Most popular</span><h3>Business</h3><p class="for">Shops, salons, pharmacies, restaurants</p><div class="price">₦45,000<small>/month</small></div><p class="for" style="min-height:0;margin:6px 0 0">₦1,500 a day</p><ul><li>180 minutes (~90 calls)</li><li>Everything in Starter</li><li>Ada calls customers back</li><li>Extra minutes ₦250</li></ul></div>
+      <div class="plan reveal"><h3>Pro</h3><p class="for">Busy restaurants, clinics, schools</p><div class="price">₦120,000<small>/month</small></div><p class="for" style="min-height:0;margin:6px 0 0">Less than a receptionist's salary</p><ul><li>550 minutes (~275 calls)</li><li>Everything in Business</li><li>Priority support</li><li>Extra minutes ₦220</li></ul></div>
     </div>
-    <p class="trial-note">Every plan starts with a <b>14-day free trial</b>. No card needed. Pay with card, transfer or USSD.</p>
+    <p class="trial-note">Every plan starts with a <b>14-day free trial</b> (20 minutes). No card needed. Pay with card, transfer or USSD.</p>
   </div>
 </section>
 
@@ -397,6 +442,24 @@
     <span><a href="/app">Business owner login</a></span>
   </div>
 </footer>
+
+<div class="sheet" id="callSheet" role="dialog" aria-modal="true" aria-labelledby="callTitle">
+  <div class="sheet-card">
+    <div class="sheet-top"><span class="live-dot"></span><span id="callTitle">Live demo · Mama Tee's Kitchen</span><button class="x" type="button" id="callClose" aria-label="Close">×</button></div>
+    <div class="orb-wrap"><div class="orb idle" id="orb">A</div></div>
+    <div class="call-status" id="callStatus">Ready when you are</div>
+    <div class="call-sub" id="callSub">Ada is a receptionist for a jollof kitchen. Call her like a customer.</div>
+    <div id="inAppWarn" class="warn" hidden>
+      <b>Your microphone may not work inside the TikTok or Instagram app.</b><br>Tap <b>⋯</b> at the top right, then <b>Open in browser</b>, and tap "Talk to Ada" again.
+      <div style="margin-top:10px"><button class="btn btn-dark" type="button" id="copyPage" style="min-height:40px;padding:8px 14px">Copy page link</button></div>
+    </div>
+    <div class="tries" id="tries"><span>"Abeg, una jollof still dey?"</span><span>"I want 2 plates to Yaba"</span><span>"Can you do discount?"</span><span>"You get ofada?"</span></div>
+    <div class="transcript" id="transcript" aria-live="polite"></div>
+    <details><summary>See Mama Tee's menu</summary><ul><li>Jollof rice &amp; chicken: ₦3,500</li><li>Fried rice &amp; chicken: ₦3,500</li><li>Ofada rice &amp; ayamase: ₦4,500 (sold out today)</li><li>Small chops, pack of 10: ₦5,000</li><li>Zobo 50cl: ₦700 · Extra dodo: ₦500</li><li>Delivery: Mainland ₦1,500 · Island ₦2,500</li></ul></details>
+    <div class="sheet-actions" id="callActions"></div>
+    <p class="consent">Uses your microphone. Demo calls are recorded to improve Pickam.</p>
+  </div>
+</div>
 
 <div class="sticky-cta" id="stickyCta"><a class="btn btn-primary js-cta" href="#join">Get early access. It's free</a></div>
 
@@ -556,11 +619,116 @@ fetch("/public-config").then((r) => r.json()).then((cfg) => {
     document.querySelectorAll(".js-cta").forEach((a) => { a.href = "/app"; a.textContent = "Start free trial"; });
     document.getElementById("formCard").innerHTML = `<div class="success"><h3>Pickam is open! 🎉</h3><p style="color:var(--muted)">Create your account with your phone number. Your 14-day free trial starts today.</p><a class="btn btn-primary" href="/app" style="width:100%;margin-top:16px">Start free trial</a></div>`;
   }
+  if (cfg.demoAvailable) {
+    document.querySelectorAll(".js-talk, .js-talk-note").forEach((el) => (el.hidden = false));
+    document.querySelector(".hero .js-watch").hidden = true;
+    if (params.get("talk") === "1") openCall();
+  }
   if (cfg.waitlistCount >= 25) {
     document.getElementById("counter").hidden = false;
     document.getElementById("counterText").textContent = `${cfg.waitlistCount.toLocaleString()} business owners have already joined`;
   }
 }).catch(() => {});
+
+// ---- Live "Talk to Ada" demo call (ElevenLabs, in the browser) ----
+const ELEVENLABS_SDK = "https://unpkg.com/@elevenlabs/client@1.31.0/dist/lib.iife.js";
+const sheet = document.getElementById("callSheet"), orb = document.getElementById("orb");
+const callStatus = document.getElementById("callStatus"), callSub = document.getElementById("callSub");
+const transcript = document.getElementById("transcript"), actions = document.getElementById("callActions");
+let conversation = null, callTimer = null, demoMax = 120, sdkPromise = null;
+const inAppBrowser = /TikTok|musical_ly|Bytedance|Instagram|FBAN|FBAV/i.test(navigator.userAgent);
+
+function loadSdk() {
+  sdkPromise ||= new Promise((resolve, reject) => {
+    const s = document.createElement("script"); s.src = ELEVENLABS_SDK; s.async = true;
+    s.onload = () => resolve(window.ElevenLabsClient); s.onerror = () => { sdkPromise = null; reject(new Error("Couldn't load the call. Check your internet and try again.")); };
+    document.head.append(s);
+  });
+  return sdkPromise;
+}
+function setActions(html) { actions.innerHTML = html; }
+function readyState() {
+  orb.className = "orb idle"; callStatus.textContent = "Ready when you are";
+  callSub.textContent = "Ada is a receptionist for a jollof kitchen. Call her like a customer.";
+  setActions(`<button class="btn btn-lime" type="button" onclick="startCall()">📞 Start call</button>`);
+}
+function openCall() {
+  sheet.classList.add("open"); document.body.style.overflow = "hidden";
+  document.getElementById("inAppWarn").hidden = !inAppBrowser;
+  if (!conversation) { transcript.innerHTML = ""; readyState(); }
+  loadSdk().catch(() => {});
+}
+async function closeCall() {
+  await endCall();
+  sheet.classList.remove("open"); document.body.style.overflow = "";
+}
+function addLine(who, text) {
+  const p = document.createElement("p"); if (who === "me") p.className = "me";
+  p.innerHTML = `<b>${who === "me" ? "You" : "Ada"}</b>${esc(text)}`;
+  transcript.append(p); transcript.scrollTop = transcript.scrollHeight;
+}
+async function startCall() {
+  setActions(`<button class="btn btn-dark" type="button" disabled>Connecting…</button>`);
+  callStatus.textContent = "Connecting…"; callSub.textContent = "Allow the microphone when your phone asks.";
+  try {
+    await navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => s.getTracks().forEach((t) => t.stop()));
+  } catch {
+    callStatus.textContent = "Microphone blocked";
+    callSub.textContent = inAppBrowser ? "Open this page in Chrome or Safari, then try again." : "Allow microphone access for this site in your browser settings, then try again.";
+    return setActions(`<button class="btn btn-lime" type="button" onclick="startCall()">Try again</button>`);
+  }
+  try {
+    const [sdk, res] = await Promise.all([loadSdk(), fetch("/demo/session", { method: "POST" })]);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "Ada couldn't pick up just now. Please try again.");
+    demoMax = body.maxSeconds || 120;
+    transcript.innerHTML = "";
+    conversation = await sdk.Conversation.startSession({
+      signedUrl: body.signedUrl,
+      onConnect: () => {
+        const started = Date.now();
+        clearInterval(callTimer);
+        callTimer = setInterval(() => {
+          const s = Math.floor((Date.now() - started) / 1000), left = Math.max(0, demoMax - s);
+          callSub.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} · demo ends in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+        }, 1000);
+        setActions(`<button class="btn btn-end" type="button" onclick="endCall()">End call</button>`);
+      },
+      onModeChange: ({ mode }) => {
+        const speaking = mode === "speaking";
+        orb.className = `orb ${speaking ? "speaking" : "listening"}`;
+        callStatus.textContent = speaking ? "Ada is speaking…" : "Listening… talk now";
+      },
+      onMessage: (m) => { if (m.message) addLine(m.source === "user" || m.role === "user" ? "me" : "ada", m.message); },
+      onError: (msg) => console.error("[demo]", msg),
+      onDisconnect: () => afterCall(),
+    });
+  } catch (err) {
+    conversation = null;
+    callStatus.textContent = "Ada couldn't pick up";
+    callSub.textContent = err.message;
+    setActions(`<button class="btn btn-lime" type="button" onclick="startCall()">Try again</button><a class="btn btn-primary" href="#join" onclick="closeCall()">Join the waitlist instead</a>`);
+  }
+}
+async function endCall() {
+  const c = conversation; conversation = null;
+  if (c) { try { await c.endSession(); } catch {} afterCall(); }
+}
+function afterCall() {
+  conversation = null; clearInterval(callTimer);
+  orb.className = "orb idle"; callStatus.textContent = "That's Pickam 🎉";
+  callSub.textContent = "Imagine Ada answering your business line like that, 24/7.";
+  setActions(`<a class="btn btn-primary" href="#join" onclick="closeCall()">I want Ada for my business</a><button class="btn btn-ghost" type="button" onclick="startCall()">Call again</button>`);
+}
+window.startCall = startCall; window.endCall = endCall; window.closeCall = closeCall;
+document.getElementById("callClose").addEventListener("click", closeCall);
+sheet.addEventListener("click", (e) => { if (e.target === sheet) closeCall(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheet.classList.contains("open")) closeCall(); });
+document.getElementById("copyPage").addEventListener("click", async (e) => {
+  const url = location.origin + "/?talk=1" + (source ? "&ref=" + encodeURIComponent(source) : "");
+  try { await navigator.clipboard.writeText(url); e.target.textContent = "Copied ✓ Paste it in Chrome or Safari"; } catch { prompt("Copy this link:", url); }
+});
+document.querySelectorAll(".js-talk").forEach((b) => b.addEventListener("click", openCall));
 
 // ---- Waitlist form ----
 document.getElementById("joinForm").addEventListener("submit", async (e) => {

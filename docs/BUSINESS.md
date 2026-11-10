@@ -43,25 +43,37 @@ Nigerians are used to prepaid (airtime, data, electricity units), so there are t
 
 | Plan | Price / month | Included minutes | ≈ Calls | Extra minutes | For |
 |---|---|---|---|---|---|
-| **Free trial** | ₦0 (14 days) | 30 | ~15 | n/a | Everyone, to try it |
-| **Starter** | **₦20,000** | 60 | ~30 | ₦300/min | Home kitchens, Instagram vendors, one-person businesses |
-| **Business** | **₦45,000** | 200 | ~100 | ₦250/min | Shops, salons, pharmacies, small restaurants, real-estate agents |
-| **Pro** | **₦110,000** | 600 | ~300 | ₦200/min | Busy restaurants, clinics, logistics, schools, multi-branch |
-| **Enterprise** | from ₦300,000 | custom | custom | custom | Chains, hospitals, estates; custom voice, integrations, SLA |
+| **Free trial** | ₦0 (14 days) | 20 | ~10 | n/a | Everyone, to try it |
 | **Pay-as-you-go** | ₦5,000 line fee | n/a | n/a | ₦350/min from wallet | Seasonal or occasional sellers |
+| **Starter** | **₦20,000** (₦667/day) | 60 | ~30 | ₦300/min | Home kitchens, Instagram vendors, one-person businesses |
+| **Business** ⭐ | **₦45,000** (₦1,500/day) | 180 | ~90 | ₦250/min | Shops, salons, pharmacies, small restaurants, real-estate agents |
+| **Pro** | **₦120,000** | 550 | ~275 | ₦220/min | Busy restaurants, clinics, logistics, schools, multi-branch |
+| **Enterprise** | from ₦300,000 | custom | custom | custom | Chains, hospitals, estates; custom voice, integrations, SLA |
 
-Annual billing gets **2 months free**. Collect payment with Paystack or Flutterwave (card, transfer, USSD).
+**Launch offer: "Founding 100".** The first 100 businesses to buy a plan get their **first month at half price** (Starter ₦10,000, Business ₦22,500, Pro ₦60,000). Renewals are full price. It's built into checkout, and `FOUNDING_SLOTS` changes the number (0 turns it off). Worst case it costs a few thousand naira per business for one month, which is cheap customer acquisition and gives a real reason to "join now" in TikTok videos.
+
+Later: annual billing with 2 months free (pay for 10, get 12). Collect payment with Paystack (card, transfer, USSD).
 
 **Why customers will pay this:** a receptionist in Lagos costs ₦70,000–150,000 a month, works 8–10 hours, and still misses calls. A single missed jollof order is ₦3,000–10,000 of lost revenue. If Pickam saves 5–7 orders a month, Starter has paid for itself. It also answers at 11pm, on Sundays, and while the owner is driving or cooking.
 
 ### Margins
 
+At about ₦130 per minute of call cost, plus about ₦6,000 a month per business for the number and SMS:
+
 | Plan | Cost if all minutes are used | Margin | Cost at typical use (60%) | Margin |
 |---|---|---|---|---|
 | Starter ₦20k | ₦13,800 | 31% | ₦10,700 | 47% |
-| Business ₦45k | ₦32,000 | 29% | ₦21,600 | 52% |
-| Pro ₦110k | ₦84,000 | 24% | ₦52,800 | 52% |
-| Extra minutes | ₦130/min | 35–57% | | |
+| Business ₦45k | ₦29,400 | 35% | ₦20,000 | 55% |
+| Pro ₦120k | ₦77,500 | 35% | ₦48,900 | 59% |
+| Extra minutes | ₦130/min | 41–57% | | |
+
+Changes from the first draft:
+- Business and Pro minutes were trimmed and Pro was raised to ₦120,000, so no plan drops below about 30% margin even when every minute is used.
+- The trial went from 30 to 20 minutes, which caps the cost of a free trial at about ₦5,000.
+
+### Website demo ("Talk to Ada") costs
+
+Each demo call costs ElevenLabs minutes, about ₦130 a minute. Calls are capped at 2 minutes, 3 per visitor per hour, and **50 a day** by default. Worst case that's about ₦13,000 a day; most demo calls last about a minute. Change the cap with `DEMO_DAILY_CALL_LIMIT` to match your budget, and raise it on days a video is blowing up. Set `DEMO_ENABLED=false` to switch the demo off.
 
 **Missed-call mode is what makes the margins work.** Most owners will use call forwarding so Pickam only answers the calls they miss. That keeps minutes low, prices affordable and margins healthy.
 

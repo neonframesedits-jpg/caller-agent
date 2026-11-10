@@ -3,6 +3,7 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import * as db from "../db.js";
+import { DemoUnavailable, demoAgentId, demoConfigured, startDemoCall } from "../demo.js";
 import { normalizePhone } from "../phone.js";
 
 export const publicRouter = Router();
@@ -25,7 +26,12 @@ function allow(req: Request): boolean {
 }
 
 publicRouter.get("/public-config", (_req, res) => {
-  res.json({ signupsOpen: config.signupsOpen, waitlistCount: db.waitlistCount() });
+  res.json({
+    signupsOpen: config.signupsOpen,
+    waitlistCount: db.waitlistCount(),
+    demoAvailable: demoConfigured() && !!demoAgentId(),
+    demoMaxSeconds: config.demo.maxCallSeconds,
+  });
 });
 
 const joinSchema = z.object({
@@ -65,6 +71,19 @@ publicRouter.post("/waitlist", (req, res) => {
     referred_by: body.referredBy && db.waitlistExists(body.referredBy) ? body.referredBy : null,
   });
   res.status(result.alreadyJoined ? 200 : 201).json({ ...result, shareUrl: `${config.publicUrl}/?ref=friend&by=${result.id}` });
+});
+
+/** Start a "Talk to Ada" demo call: returns a one-time URL the browser connects to. */
+publicRouter.post("/demo/session", async (req, res) => {
+  try {
+    res.json({ signedUrl: await startDemoCall(req.ip ?? "unknown"), maxSeconds: config.demo.maxCallSeconds });
+  } catch (err) {
+    if (err instanceof DemoUnavailable) res.status(err.status).json({ error: err.message });
+    else {
+      console.error("[demo]", err);
+      res.status(502).json({ error: "Ada couldn't pick up just now. Please try again in a minute." });
+    }
+  }
 });
 
 /** Export the waitlist: JSON by default, or CSV with ?format=csv (opens in Excel / Google Sheets). */

@@ -71,3 +71,46 @@ test("public config reflects SIGNUPS_OPEN", async () => {
   assert.equal((await client(base).req("/public-config")).body.signupsOpen, true);
   config.signupsOpen = false;
 });
+
+test("live demo: agent is created once with auth on, calls are capped per visitor and per day", async () => {
+  const { ensureDemoAgent, buildDemoAgentConfig } = await import("../src/demo.js");
+  const { mock, callsTo } = await import("./helpers.js");
+  mock(/convai\/conversation\/get-signed-url/, () => ({ signed_url: "wss://api.elevenlabs.io/demo-signed" }));
+
+  assert.equal((await client(base).req("/public-config")).body.demoAvailable, false);
+  assert.equal((await client(base).req("/demo/session", "POST")).status, 503);
+
+  const id = await ensureDemoAgent();
+  assert.equal(id, "agent_test");
+  const created = callsTo(/agents\/create/).at(-1)!.body;
+  assert.equal(created.platform_settings.auth.enable_auth, true);
+  assert.equal(created.conversation_config.conversation.max_duration_seconds, 120);
+  assert.match(created.conversation_config.agent.prompt.prompt, /LIVE DEMO of Pickam/);
+  assert.equal("llm" in created.conversation_config.agent.prompt, false, "no LLM set = ElevenLabs default");
+  // Second start-up updates the same agent instead of creating another.
+  await ensureDemoAgent();
+  assert.equal(callsTo(/agents\/create/).length, 1);
+  assert.equal(callsTo(/agents\/agent_test$/).at(-1)!.method, "PATCH");
+  assert.ok(buildDemoAgentConfig().name.includes("demo"));
+  // If someone deletes the agent in ElevenLabs, the next start-up recreates it.
+  mock(/agents\/agent_test$/, () => new Response("not found", { status: 404 }));
+  mock(/agents\/create/, () => ({ agent_id: "agent_new" }));
+  assert.equal(await ensureDemoAgent(), "agent_new");
+
+  assert.equal((await client(base).req("/public-config")).body.demoAvailable, true);
+  const first = await client(base).req("/demo/session", "POST");
+  assert.equal(first.status, 200);
+  assert.equal(first.body.signedUrl, "wss://api.elevenlabs.io/demo-signed");
+  await client(base).req("/demo/session", "POST");
+  await client(base).req("/demo/session", "POST");
+  const fourth = await client(base).req("/demo/session", "POST");
+  assert.equal(fourth.status, 429, "3 demo calls per visitor per hour");
+});
+
+test("live demo: daily cap", async () => {
+  const { startDemoCall, demoCallsToday } = await import("../src/demo.js");
+  config.demo.dailyCallLimit = demoCallsToday() + 1;
+  await startDemoCall("visitor-a");
+  await assert.rejects(startDemoCall("visitor-b"), /needs a rest/);
+  config.demo.dailyCallLimit = 50;
+});

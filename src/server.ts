@@ -8,6 +8,7 @@ import { publicRouter } from "./routes/public.js";
 import { toolsRouter } from "./routes/tools.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { startScheduler } from "./scheduler.js";
+import { ensureDemoAgent } from "./demo.js";
 
 export function createApp() {
   const app = express();
@@ -39,5 +40,8 @@ export function createApp() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   getDb();
   startScheduler();
+  ensureDemoAgent()
+    .then((id) => id && console.log(`Website demo agent ready: ${id}`))
+    .catch((err) => console.error("[demo] could not set up the website demo agent:", err.message));
   createApp().listen(config.port, () => console.log(`Pickam listening on http://localhost:${config.port}`));
 }

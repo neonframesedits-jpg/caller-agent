@@ -137,7 +137,7 @@ export function buildAgentConfig(b: Business) {
         dynamic_variables: {
           dynamic_variable_placeholders: { call_purpose: "inbound", callback_question: "none", owner_answer: "none" },
         },
-        prompt: { prompt: buildSystemPrompt(b), llm: config.elevenlabs.llm, tools: buildTools(b) },
+        prompt: { prompt: buildSystemPrompt(b), tools: buildTools(b), ...(config.elevenlabs.llm ? { llm: config.elevenlabs.llm } : {}) },
       },
       tts: config.elevenlabs.defaultVoiceId ? { voice_id: config.elevenlabs.defaultVoiceId } : undefined,
       // Caps cost per call (pranks, very long chats).

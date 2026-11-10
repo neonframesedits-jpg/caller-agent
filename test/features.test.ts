@@ -94,15 +94,20 @@ test("5. onboarding gives the business a number routed to its agent", async () =
 test("2. billing: plan purchase via Paystack, idempotent webhook", async () => {
   const checkout = await owner.req("/api/billing/checkout", "POST", { plan: "starter" });
   assert.match(checkout.body.url, /checkout\.paystack\.com/);
-  assert.equal(callsTo(/transaction\/initialize/).at(-1)!.body.amount, 2_000_000);
+  // Founding offer: the first plan payment is half price.
+  assert.equal(callsTo(/transaction\/initialize/).at(-1)!.body.amount, 1_000_000);
   assert.equal((await owner.req("/api/billing/checkout", "POST", { plan: "trial" })).status, 400);
 
   const bad = await client(base).req("/webhooks/paystack", "POST", "{}", { "x-paystack-signature": "nope" });
   assert.equal(bad.status, 401);
   assert.equal((await paystackWebhook(checkout.body.reference, 1000)).body.result, "amount too low");
-  assert.equal((await paystackWebhook(checkout.body.reference, 20_000)).body.result, "ok");
-  assert.equal((await paystackWebhook(checkout.body.reference, 20_000)).body.result, "already processed");
+  assert.equal((await paystackWebhook(checkout.body.reference, 10_000)).body.result, "ok");
+  assert.equal((await paystackWebhook(checkout.body.reference, 10_000)).body.result, "already processed");
   assert.equal(fresh().plan, "starter");
+  // Renewals are full price.
+  assert.equal((await owner.req("/api/business")).body.features.foundingDiscountPercent, 0);
+  await owner.req("/api/billing/checkout", "POST", { plan: "starter" });
+  assert.equal(callsTo(/transaction\/initialize/).at(-1)!.body.amount, 2_000_000);
 });
 
 test("2. billing: minutes run out, wallet pays, then the AI drops to message-only", async () => {

@@ -5,11 +5,15 @@ import * as db from "./db.js";
 import { formatNaira } from "./knowledge.js";
 import { alertOwner, sendSms } from "./notify.js";
 import * as paystack from "./paystack.js";
-import { PLAN_DAYS, callCharge, planFor, usageFor } from "./plans.js";
+import { FOUNDING_DISCOUNT_PERCENT, PLAN_DAYS, callCharge, planFor, usageFor } from "./plans.js";
 
 const newReference = (purpose: string) => `pk_${purpose}_${randomBytes(9).toString("hex")}`;
 
 export const MIN_TOPUP_NAIRA = 1_000;
+
+/** Founding offer: a business's first plan payment is half price while founding slots remain. */
+export const foundingOfferFor = (b: db.Business) =>
+  config.foundingSlots > 0 && !db.hasPaidForPlan(b.id) && db.countPayingBusinesses() < config.foundingSlots;
 
 export type CheckoutRequest = { kind: "plan"; plan: string } | { kind: "wallet"; amountNaira: number };
 
@@ -20,8 +24,9 @@ export async function startCheckout(b: db.Business, req: CheckoutRequest): Promi
   if (req.kind === "plan") {
     const plan = planFor(req.plan);
     if (plan.id !== req.plan || !plan.purchasable) throw new Error("Unknown plan");
-    amountNaira = plan.priceNaira;
-    meta = { plan: plan.id };
+    const founding = foundingOfferFor(b);
+    amountNaira = founding ? Math.round((plan.priceNaira * (100 - FOUNDING_DISCOUNT_PERCENT)) / 100) : plan.priceNaira;
+    meta = { plan: plan.id, ...(founding ? { founding: true } : {}) };
   } else {
     if (!Number.isInteger(req.amountNaira) || req.amountNaira < MIN_TOPUP_NAIRA) throw new Error(`Minimum top-up is ${formatNaira(MIN_TOPUP_NAIRA)}`);
     amountNaira = req.amountNaira;

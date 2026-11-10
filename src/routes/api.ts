@@ -3,7 +3,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { z } from "zod";
 import { config } from "../config.js";
 import { AuthError, requestCode, verifyCode } from "../auth.js";
-import { MIN_TOPUP_NAIRA, setupPayout, startCheckout } from "../billing.js";
+import { MIN_TOPUP_NAIRA, foundingOfferFor, setupPayout, startCheckout } from "../billing.js";
 import * as db from "../db.js";
 import { syncAgent } from "../elevenlabs.js";
 import { answerEscalation } from "../escalations.js";
@@ -11,7 +11,7 @@ import { alertBus, type OwnerAlert } from "../notify.js";
 import { NoNumbersError, addNumberToPool, provisionNumber } from "../numbers.js";
 import * as paystack from "../paystack.js";
 import { forwardingCodes, normalizePhone } from "../phone.js";
-import { PLANS, usageFor } from "../plans.js";
+import { FOUNDING_DISCOUNT_PERCENT, PLANS, usageFor } from "../plans.js";
 import { whatsappConfigured } from "../whatsapp.js";
 
 export const apiRouter = Router();
@@ -106,7 +106,12 @@ apiRouter.get("/api/business", (req: OwnerRequest, res) => {
     usage: usageFor(b),
     plans: Object.values(PLANS).filter((p) => p.purchasable),
     forwardingCodes: b.phoneNumber ? forwardingCodes(b.phoneNumber) : [],
-    features: { payments: paystack.paystackConfigured(), whatsapp: whatsappConfigured(), minTopUpNaira: MIN_TOPUP_NAIRA },
+    features: {
+      payments: paystack.paystackConfigured(),
+      whatsapp: whatsappConfigured(),
+      minTopUpNaira: MIN_TOPUP_NAIRA,
+      foundingDiscountPercent: foundingOfferFor(b) ? FOUNDING_DISCOUNT_PERCENT : 0,
+    },
   });
 });
 

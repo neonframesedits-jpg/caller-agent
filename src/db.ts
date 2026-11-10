@@ -234,6 +234,18 @@ export function openDb(path: string): DatabaseSync {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Small settings Pickam stores for itself, e.g. the website demo agent's id.
+    CREATE TABLE IF NOT EXISTS kv (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    -- Website "Talk to Ada" demo calls per day, for the daily cost cap.
+    CREATE TABLE IF NOT EXISTS demo_calls (
+      day TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0
+    );
+
     -- Early-access sign-ups from the landing page.
     CREATE TABLE IF NOT EXISTS waitlist (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -761,3 +773,28 @@ export const listWaitlist = () =>
       `SELECT w.*, (SELECT COUNT(*) FROM waitlist r WHERE r.referred_by = w.id) AS referrals FROM waitlist w ORDER BY w.id`,
     )
     .all() as unknown as (WaitlistEntry & { referrals: number })[];
+
+// ---- Key-value settings and demo call counter ---------------------------------------------
+
+export const kvGet = (key: string) => (getDb().prepare("SELECT value FROM kv WHERE key = ?").get(key) as Row | undefined)?.value as string | undefined;
+export const kvSet = (key: string, value: string) =>
+  getDb().prepare("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+
+/** Count one demo call for today, unless the daily limit is reached. Returns false when full. */
+export function takeDemoCallSlot(day: string, dailyLimit: number): boolean {
+  const changes = getDb()
+    .prepare(
+      `INSERT INTO demo_calls (day, count) VALUES (?, 1)
+       ON CONFLICT(day) DO UPDATE SET count = count + 1 WHERE demo_calls.count < ?`,
+    )
+    .run(day, dailyLimit).changes;
+  return Number(changes) === 1;
+}
+
+export const demoCallsOn = (day: string) => Number((getDb().prepare("SELECT count FROM demo_calls WHERE day = ?").get(day) as Row | undefined)?.count ?? 0);
+
+/** Businesses that have paid for a plan at least once (for the founding-member offer). */
+export const countPayingBusinesses = () =>
+  Number((getDb().prepare("SELECT COUNT(DISTINCT business_id) AS n FROM payments WHERE purpose = 'plan' AND status = 'success'").get() as Row).n);
+export const hasPaidForPlan = (businessId: string) =>
+  !!getDb().prepare("SELECT 1 FROM payments WHERE business_id = ? AND purpose = 'plan' AND status = 'success'").get(businessId);

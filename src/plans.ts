@@ -15,14 +15,17 @@ export interface Plan {
 export const PLAN_DAYS = 30;
 
 export const PLANS: Record<string, Plan> = {
-  trial: { id: "trial", name: "Free trial", priceNaira: 0, includedMinutes: 30, overagePerMinuteNaira: 350, purchasable: false },
+  trial: { id: "trial", name: "Free trial", priceNaira: 0, includedMinutes: 20, overagePerMinuteNaira: 350, purchasable: false },
   payg: { id: "payg", name: "Pay-as-you-go", priceNaira: 5_000, includedMinutes: 0, overagePerMinuteNaira: 350, purchasable: true },
   starter: { id: "starter", name: "Starter", priceNaira: 20_000, includedMinutes: 60, overagePerMinuteNaira: 300, purchasable: true },
-  business: { id: "business", name: "Business", priceNaira: 45_000, includedMinutes: 200, overagePerMinuteNaira: 250, purchasable: true },
-  pro: { id: "pro", name: "Pro", priceNaira: 110_000, includedMinutes: 600, overagePerMinuteNaira: 200, purchasable: true },
+  business: { id: "business", name: "Business", priceNaira: 45_000, includedMinutes: 180, overagePerMinuteNaira: 250, purchasable: true },
+  pro: { id: "pro", name: "Pro", priceNaira: 120_000, includedMinutes: 550, overagePerMinuteNaira: 220, purchasable: true },
 };
 
 export const planFor = (id: string) => PLANS[id] ?? PLANS.trial;
+
+/** First month at half price for the first FOUNDING_SLOTS businesses to buy a plan. */
+export const FOUNDING_DISCOUNT_PERCENT = 50;
 
 /** "full" = answers and takes orders; "message_only" = only takes a message for the owner. */
 export type ServiceMode = "full" | "message_only";
