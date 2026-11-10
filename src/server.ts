@@ -4,18 +4,25 @@ import { ZodError } from "zod";
 import { config } from "./config.js";
 import { getDb } from "./db.js";
 import { apiRouter } from "./routes/api.js";
+import { publicRouter } from "./routes/public.js";
 import { toolsRouter } from "./routes/tools.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { startScheduler } from "./scheduler.js";
 
 export function createApp() {
   const app = express();
+  // Railway (and most hosts) sit behind one proxy; this makes req.ip the visitor's address.
+  app.set("trust proxy", 1);
+  const publicDir = fileURLToPath(new URL("../public", import.meta.url));
   // Webhooks need the raw body for signature checks, so they are mounted before the JSON parser.
   app.use("/webhooks", webhooksRouter);
   app.use(express.json({ limit: "1mb" }));
   app.use("/tools", toolsRouter);
+  app.use(publicRouter);
   app.use(apiRouter);
-  app.use(express.static(fileURLToPath(new URL("../public", import.meta.url))));
+  // "/" is the landing page (public/index.html); "/app" is the owner dashboard.
+  app.get("/app", (_req, res) => res.sendFile("app.html", { root: publicDir }));
+  app.use(express.static(publicDir));
   app.get("/health", (_req, res) => res.json({ ok: true }));
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

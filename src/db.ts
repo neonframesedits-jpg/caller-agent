@@ -234,6 +234,19 @@ export function openDb(path: string): DatabaseSync {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- Early-access sign-ups from the landing page.
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      business_name TEXT NOT NULL,
+      phone TEXT NOT NULL UNIQUE,
+      category TEXT NOT NULL DEFAULT '',
+      city TEXT NOT NULL DEFAULT '',
+      source TEXT NOT NULL DEFAULT '',     -- e.g. "tiktok", from ?ref= or utm_source
+      referred_by INTEGER,                 -- waitlist id of the person who shared the link
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     -- Links WhatsApp alerts we sent to the escalation they were about, so a swipe-reply answers it.
     CREATE TABLE IF NOT EXISTS wa_messages (
       wa_message_id TEXT PRIMARY KEY,
@@ -710,3 +723,41 @@ export function claimPoolNumber(businessId: string): PoolNumber | undefined {
 }
 
 export const releasePoolNumber = (number: string) => getDb().prepare("UPDATE phone_numbers SET business_id = NULL WHERE number = ?").run(number);
+
+// ---- Waitlist ---------------------------------------------------------------------------
+
+export interface WaitlistEntry {
+  id: number;
+  name: string;
+  business_name: string;
+  phone: string;
+  category: string;
+  city: string;
+  source: string;
+  referred_by: number | null;
+  created_at: string;
+}
+
+/** Add someone to the waitlist. Signing up twice with the same number keeps the first spot. */
+export function joinWaitlist(e: Omit<WaitlistEntry, "id" | "created_at">): { id: number; position: number; alreadyJoined: boolean } {
+  const existing = getDb().prepare("SELECT id FROM waitlist WHERE phone = ?").get(e.phone) as Row | undefined;
+  const id = existing
+    ? Number(existing.id)
+    : Number(
+        getDb()
+          .prepare("INSERT INTO waitlist (name, business_name, phone, category, city, source, referred_by) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(e.name, e.business_name, e.phone, e.category, e.city, e.source, e.referred_by).lastInsertRowid,
+      );
+  const position = Number((getDb().prepare("SELECT COUNT(*) AS n FROM waitlist WHERE id <= ?").get(id) as Row).n);
+  return { id, position, alreadyJoined: !!existing };
+}
+
+export const waitlistExists = (id: number) => !!getDb().prepare("SELECT 1 FROM waitlist WHERE id = ?").get(id);
+export const waitlistCount = () => Number((getDb().prepare("SELECT COUNT(*) AS n FROM waitlist").get() as Row).n);
+
+export const listWaitlist = () =>
+  getDb()
+    .prepare(
+      `SELECT w.*, (SELECT COUNT(*) FROM waitlist r WHERE r.referred_by = w.id) AS referrals FROM waitlist w ORDER BY w.id`,
+    )
+    .all() as unknown as (WaitlistEntry & { referrals: number })[];

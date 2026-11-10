@@ -24,6 +24,21 @@ Nigerian number (SIP trunk) ──► ElevenLabs Agent (voice + LLM)
                               voice notes · daily summary   customer payments
 ```
 
+**New here? Start with these guides:**
+- [`docs/LAUNCH.md`](docs/LAUNCH.md): put the website online on Railway and start collecting sign-ups from TikTok.
+- [`docs/ELEVENLABS_SETUP.md`](docs/ELEVENLABS_SETUP.md): get your ElevenLabs API key and choose Ada's voice.
+- [`docs/BUSINESS.md`](docs/BUSINESS.md): name, pricing and launch plan.
+
+## Pages
+
+| Address | What it is |
+|---|---|
+| `/` | Landing page: animated call demo, missed-call calculator, pricing, FAQ, early-access form |
+| `/app` | Business owner dashboard: login, setup wizard, callbacks, orders, settings |
+| `/admin/waitlist?format=csv&key=ADMIN_KEY` | Download the waitlist as a spreadsheet, with source (`?ref=tiktok`) and referrals |
+
+While `SIGNUPS_OPEN=false`, the landing page collects a waitlist. Set it to `true` at launch and the buttons go straight to signup.
+
 ## Features
 
 **On the call**
@@ -60,7 +75,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:3000` and log in with any Nigerian number. Without Africa's Talking keys, the login code is printed in the server console. Without keys, everything else works too: the integrations just switch off.
+Open `http://localhost:3000` for the landing page, or `http://localhost:3000/app` and log in with any Nigerian number. Without Africa's Talking keys, the login code is printed in the server console. Without keys, everything else works too: the integrations just switch off.
 
 To give test signups a number, add one to the pool:
 
@@ -131,7 +146,11 @@ Test with each network (MTN, Airtel, Glo, 9mobile) whether the original caller's
 | `src/elevenlabs.ts` | Agent prompt, tools, agent sync, outbound calls, speech-to-text, number import |
 | `src/knowledge.ts` | Matches callers' questions to answers and spoken items to the menu (Pidgin-aware) |
 | `src/db.ts` | SQLite schema and data access |
-| `public/index.html` | Owner dashboard: login, setup wizard, inbox, orders, calls, menu, answers, plan and number, settings |
+| `public/index.html` | Landing page (served at `/`) |
+| `public/app.html` | Owner dashboard (served at `/app`): login, setup wizard, inbox, orders, calls, menu, answers, plan and number, settings |
+| `src/routes/public.ts` | Waitlist sign-ups (honeypot and per-IP limit), waitlist export, public config |
+| `scripts/make-demo-audio.ts` | Generates the landing page's "Hear Ada" clips with your ElevenLabs voice |
+| `scripts/make-og-image.cjs` | Renders `public/og.png`, the preview image for shared links |
 | `docs/BUSINESS.md` | Name, pricing, unit economics, go-to-market, roadmap |
 
 ## Security notes

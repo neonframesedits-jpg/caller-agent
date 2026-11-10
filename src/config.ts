@@ -20,6 +20,8 @@ export const config = {
   /** Pickam staff phone, alerted when e.g. the phone number pool runs out. */
   adminPhone: env("ADMIN_PHONE"),
   databasePath: env("DATABASE_PATH", "data/pickam.db"),
+  /** false = the landing page collects early-access sign-ups; true = it sends people straight to signup. */
+  signupsOpen: env("SIGNUPS_OPEN", "false") === "true",
   elevenlabs: {
     apiKey: env("ELEVENLABS_API_KEY"),
     defaultVoiceId: env("ELEVENLABS_DEFAULT_VOICE_ID"),

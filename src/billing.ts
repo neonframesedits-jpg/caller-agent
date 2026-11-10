@@ -33,7 +33,7 @@ export async function startCheckout(b: db.Business, req: CheckoutRequest): Promi
     amountNaira,
     email: paystack.placeholderEmail(b.ownerPhone),
     reference,
-    callbackUrl: `${config.publicUrl}/?paid=${reference}`,
+    callbackUrl: `${config.publicUrl}/app?paid=${reference}`,
     metadata: { business_id: b.id, purpose: req.kind, ...meta },
   });
   return { url: tx.authorization_url, reference };

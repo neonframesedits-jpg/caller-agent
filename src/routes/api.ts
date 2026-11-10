@@ -56,7 +56,7 @@ apiRouter.post("/admin/businesses", adminAuth, (req, res) => {
   const ownerPhone = body.ownerPhone ? normalizePhone(body.ownerPhone) : "";
   if (ownerPhone === null) return void fail(res, 400, "invalid ownerPhone");
   const b = db.createBusiness({ ...body, ownerPhone });
-  res.status(201).json({ id: b.id, ownerToken: b.ownerToken, dashboard: `${config.publicUrl}/?token=${b.ownerToken}` });
+  res.status(201).json({ id: b.id, ownerToken: b.ownerToken, dashboard: `${config.publicUrl}/app?token=${b.ownerToken}` });
 });
 
 /** Add a number bought from the SIP provider to the pool handed out at onboarding. */

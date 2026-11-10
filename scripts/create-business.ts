@@ -12,4 +12,4 @@ const b = createBusiness({ name, ownerName, ownerPhone: ownerPhone ? normalizePh
 console.log(`Created ${b.name}`);
 console.log(`  id:          ${b.id}`);
 console.log(`  owner token: ${b.ownerToken}`);
-console.log(`  dashboard:   ${config.publicUrl}/?token=${b.ownerToken}`);
+console.log(`  dashboard:   ${config.publicUrl}/app?token=${b.ownerToken}`);
